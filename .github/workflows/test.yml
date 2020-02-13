@@ -17,8 +17,8 @@ jobs:
           default: true
       - name: Test ${{ matrix.os }} binding
         run: |
-	  python3 -m venv venv3
-	  source venv3/bin/activate
+          python3 -m venv venv3
+          source venv3/bin/activate
           python3 -m pip install maturin
           maturin develop
           python3 tests/test_decode.py
