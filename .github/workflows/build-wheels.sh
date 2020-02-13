@@ -9,3 +9,5 @@ done
 for wheel in target/wheels/*.whl; do
     auditwheel repair "${wheel}"
 done
+
+twine upload wheelhouse

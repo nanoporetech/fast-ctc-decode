@@ -16,6 +16,9 @@ jobs:
          bash .github/workflows/build-wheels.sh
   osx-wheels:
     runs-on: macos-latest
+    strategy:
+      matrix:
+        python-version: [3.5, 3.6, 3.7, 3.8]
     steps:
      - uses: actions/checkout@v1
      - uses: actions-rs/toolchain@v1
@@ -24,8 +27,8 @@ jobs:
          default: true
      - uses: actions/setup-python@v1
        with:
-         python-version: '3.x'
+         python-version: ${{ matrix.python-version }}
      - name: Build wheels
        run: |
          python3 -m pip install maturin
-         maturin build
+         maturin publish -u ${{ secrets.PYPI_USERNAME }} -p ${{ secrets.PYPI_PASSWORD }}
