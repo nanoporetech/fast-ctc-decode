@@ -8,6 +8,10 @@ jobs:
     container: quay.io/pypa/manylinux1_x86_64
     steps:
      - uses: actions/checkout@v1
+     - uses: actions/upload-artifact@v1
+       with:
+         name: linux-wheels
+         path: wheelhouse/
      - name: Build wheels
        run: |
          curl https://sh.rustup.rs -sSf | sh -s -- -y
@@ -28,7 +32,11 @@ jobs:
      - uses: actions/setup-python@v1
        with:
          python-version: ${{ matrix.python-version }}
+     - uses: actions/upload-artifact@v1
+       with:
+         name: osx-${{ matrix.python-version }}-wheel
+         path: target/wheels
      - name: Build wheels
        run: |
          python3 -m pip install maturin
-         maturin publish -i python${{ matrix.python-version }} -u ${{ secrets.PYPI_USERNAME }} -p ${{ secrets.PYPI_PASSWORD }}
+         maturin build
