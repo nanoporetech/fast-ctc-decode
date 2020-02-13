@@ -11,7 +11,10 @@ class Tests(TestCase):
         self.beam_size = 5
         self.alphabet = "NACGT"
         self.beam_cut_threshold = 0.1
-        self.probs = np.random.rand(100, 5).astype(np.float32)
+        self.probs = self.get_random_data()
+
+    def get_random_data(self):
+        return np.random.rand(100, len(self.alphabet)).astype(np.float32)
 
     def test_beam_search(self):
         """ simple beam search test with the canonical alphabet"""
@@ -21,6 +24,18 @@ class Tests(TestCase):
     def test_beam_search_alphabet(self):
         """ simple beam search test with different alphabet"""
         seq = beam_search(self.probs, "NRUST", self.beam_size, self.beam_cut_threshold)
+        self.assertEqual(len(set(seq)), len(self.alphabet) - 1)
+
+    def test_beam_search_short_alphabet(self):
+        """ simple beam search test with short alphabet"""
+        alphabet = "NAG"
+        seq = beam_search(self.probs, alphabet, self.beam_size, self.beam_cut_threshold)
+        self.assertEqual(len(set(seq)), len(alphabet) - 1)
+
+    def test_beam_search_long_alphabet(self):
+        """ simple beam search test with long alphabet"""
+        self.alphabet = "NABCDEFGHIJK"
+        seq = beam_search(self.get_random_data(), self.alphabet, self.beam_size, self.beam_cut_threshold)
         self.assertEqual(len(set(seq)), len(self.alphabet) - 1)
 
 
