@@ -5,15 +5,18 @@ on: [push]
 jobs:
 
   test:
-
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v1
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly
           default: true
-      - name: Test binding
+      - name: Test ${{ matrix.os }} binding
         run: |
           python3 -m pip install maturin
-          make test
+          maturin develop
+          python3 tests/test_decode.py
