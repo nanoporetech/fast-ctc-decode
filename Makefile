@@ -2,7 +2,7 @@ clean:
 	rm -rf *~ dist *.egg-info build target
 
 build:
-	maturin build
+	maturin build --release
 
 develop:
 	maturin develop

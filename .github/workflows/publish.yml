@@ -40,7 +40,7 @@ jobs:
      - name: Build wheels
        run: |
          python3 -m pip install maturin
-         maturin build
+         maturin build --release
      - uses: actions/upload-artifact@v1
        with:
          name: osx-${{ matrix.python-version }}-wheel
