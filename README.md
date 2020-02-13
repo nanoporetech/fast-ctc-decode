@@ -1,8 +1,8 @@
 # fast-ctc-decode
 
-![test](https://github.com/nanoporetech/fast-ctc-decode/workflows/test/badge.svg)
+![fast-ctc-decode](https://github.com/nanoporetech/fast-ctc-decode/workflows/fast-ctc-decode/badge.svg)
 
-Blazingly fast beam search.
+Blitzing fast beam search.
 
 ```
 $ pip install fast-ctc-decode
