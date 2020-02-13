@@ -2,8 +2,8 @@ name: publish-fast-ctc-decode
 
 on:
   push:
-    branches:
-       - refs/tags/*
+    tags:
+       - 'v*'
 
 jobs:
 
