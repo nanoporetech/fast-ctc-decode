@@ -8,7 +8,6 @@ on:
 jobs:
 
   linux-wheels:
-
     runs-on: ubuntu-latest
     container: quay.io/pypa/manylinux1_x86_64
     steps:
@@ -25,10 +24,6 @@ jobs:
          path: wheelhouse/
 
   osx-wheels:
-    on:
-      push:
-        branches:
-          - refs/tags/*
     runs-on: macos-latest
     strategy:
       matrix:
