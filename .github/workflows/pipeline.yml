@@ -1,9 +1,11 @@
-name: fast-ctc-decode
+name: test-fast-ctc-decode
+
+on: [push]
 
 jobs:
 
   test:
-    on: [push]
+
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
@@ -16,11 +18,15 @@ jobs:
           python3 -m pip install maturin
           make test
 
+name: wheels-fast-ctc-decode
+
+on:
+  push:
+    branches:
+       - refs/tags/*
+
   linux-wheels:
-    on:
-      push:
-        branches:
-          - refs/tags/*
+
     runs-on: ubuntu-latest
     container: quay.io/pypa/manylinux1_x86_64
     steps:
