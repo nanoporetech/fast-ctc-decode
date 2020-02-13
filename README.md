@@ -1,6 +1,6 @@
 # fast-ctc-decode
 
-![test](https://github.com/iiSeymour/fast-ctc-decode/workflows/test/badge.svg)
+![test](https://github.com/nanoporetech/fast-ctc-decode/workflows/test/badge.svg)
 
 Blazingly fast beam search.
 
