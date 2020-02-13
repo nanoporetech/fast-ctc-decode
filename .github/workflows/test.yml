@@ -15,9 +15,9 @@ jobs:
         with:
           toolchain: nightly
           default: true
-     - uses: actions/setup-python@v1
-       with:
-         python-version: '3.7'
+      - uses: actions/setup-python@v1
+        with:
+          python-version: '3.7'
       - name: Test ${{ matrix.os }} binding
         run: |
           python3 -m venv venv3
