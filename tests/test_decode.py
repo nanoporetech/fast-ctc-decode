@@ -13,8 +13,8 @@ class Tests(TestCase):
         self.beam_cut_threshold = 0.1
         self.probs = self.get_random_data()
 
-    def get_random_data(self):
-        return np.random.rand(100, len(self.alphabet)).astype(np.float32)
+    def get_random_data(self, samples=100):
+        return np.random.rand(samples, len(self.alphabet)).astype(np.float32)
 
     def test_beam_search(self):
         """ simple beam search test with the canonical alphabet"""
@@ -35,7 +35,8 @@ class Tests(TestCase):
     def test_beam_search_long_alphabet(self):
         """ simple beam search test with long alphabet"""
         self.alphabet = "NABCDEFGHIJK"
-        seq = beam_search(self.get_random_data(), self.alphabet, self.beam_size, self.beam_cut_threshold)
+        self.probs = self.get_random_data(10000)
+        seq = beam_search(self.probs, self.alphabet, self.beam_size, self.beam_cut_threshold)
         self.assertEqual(len(set(seq)), len(self.alphabet) - 1)
 
 
