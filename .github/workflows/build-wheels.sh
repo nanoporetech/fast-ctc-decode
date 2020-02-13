@@ -10,4 +10,5 @@ for wheel in target/wheels/*.whl; do
     auditwheel repair "${wheel}"
 done
 
-twine upload wheelhouse
+/opt/python/cp35-cp35m/bin/python -m pip install twine
+/opt/python/cp35-cp35m/bin/python twine upload wheelhouse
