@@ -31,4 +31,4 @@ jobs:
      - name: Build wheels
        run: |
          python3 -m pip install maturin
-         maturin publish -i python${{ matrix.python-version }} -u ${{ secrets.PYPI_USERNAME }} -p {{ secrets.PYPI_PASSWORD }}
+         maturin publish -i python${{ matrix.python-version }} -u ${{ secrets.PYPI_USERNAME }} -p ${{ secrets.PYPI_PASSWORD }}
