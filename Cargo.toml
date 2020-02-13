@@ -1,0 +1,19 @@
+[package]
+name = "fast_ctc_decode"
+version = "0.1.0"
+authors = ["Vlado Boza <bozavlado@gmail.com>", "Chris Seymour <chris.seymour@nanoporetech.com>"]
+edition = "2018"
+
+[lib]
+name = "fast_ctc_decode"
+crate-type = ["cdylib"]
+
+[dependencies]
+numpy = "0.7.0"
+ndarray = { version = "0.13.0", features = ["blas"] }
+pyo3 = { version = "0.8.5", features = ["extension-module"] }
+
+[profile.release]
+lto=true
+codegen-units=1
+panic="abort"

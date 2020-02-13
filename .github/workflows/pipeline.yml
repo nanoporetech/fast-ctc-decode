@@ -1,0 +1,31 @@
+name: fast-ctc-decode
+
+on: [push]
+
+jobs:
+  linux-wheels:
+    runs-on: ubuntu-latest
+    container: quay.io/pypa/manylinux1_x86_64
+    steps:
+     - uses: actions/checkout@v1
+     - name: Build wheels
+       run: |
+         curl https://sh.rustup.rs -sSf | sh -s -- -y
+         source $HOME/.cargo/env
+         rustup default nightly-2019-12-11
+         bash .github/workflows/build-wheels.sh
+  osx-wheels:
+    runs-on: macos-latest
+    steps:
+     - uses: actions/checkout@v1
+     - uses: actions-rs/toolchain@v1
+       with:
+         toolchain: nightly
+         default: true
+     - uses: actions/setup-python@v1
+       with:
+         python-version: '3.x'
+     - name: Build wheels
+       run: |
+         python3 -m pip install maturin
+         maturin build

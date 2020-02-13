@@ -1,0 +1,8 @@
+*~
+venv*/
+*.lock
+dist/
+*.egg-info/
+*.so
+target/
+
