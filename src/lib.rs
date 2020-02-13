@@ -30,7 +30,6 @@ fn beam_search_<D: Data<Elem=f32>>(result: &ArrayBase<D, Ix2>, alphabet: String,
     // (base, what)
     let mut beam_prevs = vec![(0, 0)];
     let mut beam_forward: Vec<Vec<i32>> = vec![vec![-1; alphabet_size]];
-
     let mut cur_probs = vec![(0i32, 0.0, 1.0)];
     let mut new_probs = Vec::new();
 
@@ -43,7 +42,7 @@ fn beam_search_<D: Data<Elem=f32>>(result: &ArrayBase<D, Ix2>, alphabet: String,
                 new_probs.push((beam, 0.0, (n_prob + base_prob) * pr[0]));
             }
 
-            for b in 1..alphabet.len() {
+            for b in 1..alphabet_size + 1 {
                 if pr[b] < beam_cut_threshold {
                     continue
                 }
