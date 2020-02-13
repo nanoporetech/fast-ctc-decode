@@ -4,7 +4,29 @@ on: [push]
 
 jobs:
 
+  test:
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          default: true
+      - name: Test binding
+        run: |
+          python3 -m pip install maturin
+          make test
+
+on:
+  push:
+    branches:
+      - refs/tags/*
+
+jobs:
+
   linux-wheels:
+
     runs-on: ubuntu-latest
     container: quay.io/pypa/manylinux1_x86_64
     steps:
