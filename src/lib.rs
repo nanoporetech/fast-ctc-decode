@@ -1,17 +1,21 @@
 #![feature(static_nobundle)]
 
 #[macro_use(s)]
-
 extern crate ndarray;
 
-use numpy::{PyArray2};
-use ndarray::{Ix2, ArrayBase, Data};
+use numpy::PyArray2;
+use ndarray::{ArrayBase, Data, Ix2};
 
 use pyo3::prelude::*;
 use pyo3::wrap_pyfunction;
 
 #[pyfunction]
-fn beam_search(result: &PyArray2<f32>, alphabet: String, beam_size: usize, beam_cut_threshold: f32) -> String {
+fn beam_search(
+    result: &PyArray2<f32>,
+    alphabet: String,
+    beam_size: usize,
+    beam_cut_threshold: f32,
+) -> (String, Vec<usize>) {
     beam_search_(&result.as_array(), alphabet, beam_size, beam_cut_threshold)
 }
 
@@ -21,20 +25,30 @@ fn fast_ctc_decode(_py: Python, m: &PyModule) -> PyResult<()> {
     Ok(())
 }
 
-fn beam_search_<D: Data<Elem=f32>>(result: &ArrayBase<D, Ix2>, alphabet: String, beam_size: usize, beam_cut_threshold: f32) -> String {
+fn beam_search_<D: Data<Elem = f32>>(
+    result: &ArrayBase<D, Ix2>,
+    alphabet: String,
+    beam_size: usize,
+    beam_cut_threshold: f32,
+) -> (String, Vec<usize>) {
 
     let alphabet: Vec<char> = alphabet.chars().collect();
+
     // alphabet_size minus the blank label
     let alphabet_size = alphabet.len() - 1;
+    let duration = result.len() / alphabet.len();
 
-    // (base, what)
-    let mut beam_prevs = vec![(0, 0)];
+    // (base, what, idx)
+    let mut beam_prevs = vec![(0, 0, 0)];
     let mut beam_forward: Vec<Vec<i32>> = vec![vec![-1; alphabet_size]];
     let mut cur_probs = vec![(0i32, 0.0, 1.0)];
     let mut new_probs = Vec::new();
 
-    for pr in result.slice(s![..;-1, ..]).outer_iter() {
+    for (idx, pr) in result.slice(s![..;-1, ..]).outer_iter().enumerate() {
         new_probs.clear();
+
+        // forward index in time
+        let fidx = duration - idx - 1;
 
         for &(beam, base_prob, n_prob) in &cur_probs {
             // add N to beam
@@ -44,26 +58,25 @@ fn beam_search_<D: Data<Elem=f32>>(result: &ArrayBase<D, Ix2>, alphabet: String,
 
             for b in 1..alphabet_size + 1 {
                 if pr[b] < beam_cut_threshold {
-                    continue
+                    continue;
                 }
                 if b == beam_prevs[beam as usize].0 {
                     new_probs.push((beam, base_prob * pr[b], 0.0));
-                    let mut new_beam = beam_forward[beam as usize][b-1];
+                    let mut new_beam = beam_forward[beam as usize][b - 1];
                     if new_beam == -1 {
                         new_beam = beam_prevs.len() as i32;
-                        beam_prevs.push((b, beam));
-                        beam_forward[beam as usize][b-1] = new_beam;
+                        beam_prevs.push((b, beam, fidx));
+                        beam_forward[beam as usize][b - 1] = new_beam;
                         beam_forward.push(vec![-1; alphabet_size]);
                     }
 
                     new_probs.push((new_beam, n_prob * pr[b], 0.0));
-
                 } else {
-                    let mut new_beam = beam_forward[beam as usize][b-1];
+                    let mut new_beam = beam_forward[beam as usize][b - 1];
                     if new_beam == -1 {
                         new_beam = beam_prevs.len() as i32;
-                        beam_prevs.push((b, beam));
-                        beam_forward[beam as usize][b-1] = new_beam;
+                        beam_prevs.push((b, beam, fidx));
+                        beam_forward[beam as usize][b - 1] = new_beam;
                         beam_forward.push(vec![-1; alphabet_size]);
                     }
 
@@ -97,11 +110,15 @@ fn beam_search_<D: Data<Elem=f32>>(result: &ArrayBase<D, Ix2>, alphabet: String,
         }
     }
 
-    let mut out = String::new();
     let mut beam = cur_probs[0].0;
+    let mut path = Vec::new();
+    let mut sequence = String::new();
+
     while beam != 0 {
-        out.push(alphabet[beam_prevs[beam as usize].0]);
+        path.push(beam_prevs[beam as usize].2);
+        sequence.push(alphabet[beam_prevs[beam as usize].0]);
         beam = beam_prevs[beam as usize].1;
     }
-    out
+
+    (sequence, path)
 }
