@@ -58,6 +58,40 @@ class Tests(TestCase):
         np.testing.assert_array_equal(emit, path)
         self.assertEqual(len(seq), len(path))
 
+    def test_repeat_sequence_path(self):
+        """ simple beam search path test with a repeated sequence """
+        w = 20
+        x = np.zeros((w, len(self.alphabet)), np.float32)
+        x[:, 0] = 0.5  # set stay prob
+
+        expected_path = [6, 13, 18]
+        for idx in expected_path:
+            x[idx, 0] = 0.0
+            x[idx, 1] = 1.0
+
+        seq, path = beam_search(x, self.alphabet, self.beam_size, self.beam_cut_threshold)
+
+        self.assertEqual(seq, 'AAA')
+        self.assertEqual(len(seq), len(path))
+        self.assertEqual(path, expected_path)
+
+    def test_repeat_sequence_path_with_spread(self):
+        """ simple beam search path test with a repeated sequence with probabilities spread"""
+        w = 20
+        x = np.zeros((w, len(self.alphabet)), np.float32)
+        x[:, 0] = 0.5  # set stay prob
+
+        expected_path = [6, 13, 18]
+        for idx in expected_path:
+            x[idx-1:idx + 1, 0] = 0.0
+            x[idx-1:idx + 1, 1] = 1.0
+
+        seq, path = beam_search(x, self.alphabet, self.beam_size, self.beam_cut_threshold)
+
+        self.assertEqual(seq, 'AAA')
+        self.assertEqual(len(seq), len(path))
+        self.assertEqual(path, expected_path)
+
 
 if __name__ == '__main__':
     main()

@@ -63,7 +63,7 @@ fn beam_search_<D: Data<Elem = f32>>(
                 if b == beam_prevs[beam as usize].0 {
                     new_probs.push((beam, base_prob * pr[b], 0.0));
                     let mut new_beam = beam_forward[beam as usize][b - 1];
-                    if new_beam == -1 {
+                    if new_beam == -1 && n_prob > 0.0 {
                         new_beam = beam_prevs.len() as i32;
                         beam_prevs.push((b, beam, fidx));
                         beam_forward[beam as usize][b - 1] = new_beam;
