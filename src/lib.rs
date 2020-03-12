@@ -7,6 +7,7 @@ use numpy::PyArray2;
 use ndarray::{ArrayBase, Data, Ix2};
 
 use pyo3::prelude::*;
+use pyo3::exceptions::ValueError;
 use pyo3::wrap_pyfunction;
 
 #[pyfunction]
@@ -15,8 +16,14 @@ fn beam_search(
     alphabet: String,
     beam_size: usize,
     beam_cut_threshold: f32,
-) -> (String, Vec<usize>) {
-    beam_search_(&result.as_array(), alphabet, beam_size, beam_cut_threshold)
+) -> PyResult<(String, Vec<usize>)> {
+    if alphabet.len() != result.shape()[1] {
+        Err(ValueError::py_err("alphabet size does not match probability matrix dimensions"))
+    } else if beam_size == 0 {
+        Err(ValueError::py_err("beam_size cannot be 0"))
+    } else {
+        Ok(beam_search_(&result.as_array(), alphabet, beam_size, beam_cut_threshold))
+    }
 }
 
 #[pymodule]
@@ -36,7 +43,7 @@ fn beam_search_<D: Data<Elem = f32>>(
 
     // alphabet_size minus the blank label
     let alphabet_size = alphabet.len() - 1;
-    let duration = result.len() / alphabet.len();
+    let duration = result.nrows();
 
     // (base, what, idx)
     let mut beam_prevs = vec![(0, 0, 0)];
@@ -56,12 +63,12 @@ fn beam_search_<D: Data<Elem = f32>>(
                 new_probs.push((beam, 0.0, (n_prob + base_prob) * pr[0]));
             }
 
-            for b in 1..alphabet_size + 1 {
-                if pr[b] < beam_cut_threshold {
+            for (b,&pr_b) in (1..alphabet_size + 1).zip(pr.iter().skip(1)) {
+                if pr_b < beam_cut_threshold {
                     continue;
                 }
                 if b == beam_prevs[beam as usize].0 {
-                    new_probs.push((beam, base_prob * pr[b], 0.0));
+                    new_probs.push((beam, base_prob * pr_b, 0.0));
                     let mut new_beam = beam_forward[beam as usize][b - 1];
                     if new_beam == -1 && n_prob > 0.0 {
                         new_beam = beam_prevs.len() as i32;
@@ -70,7 +77,7 @@ fn beam_search_<D: Data<Elem = f32>>(
                         beam_forward.push(vec![-1; alphabet_size]);
                     }
 
-                    new_probs.push((new_beam, n_prob * pr[b], 0.0));
+                    new_probs.push((new_beam, n_prob * pr_b, 0.0));
                 } else {
                     let mut new_beam = beam_forward[beam as usize][b - 1];
                     if new_beam == -1 {
@@ -80,7 +87,7 @@ fn beam_search_<D: Data<Elem = f32>>(
                         beam_forward.push(vec![-1; alphabet_size]);
                     }
 
-                    new_probs.push((new_beam, (base_prob + n_prob) * pr[b], 0.0));
+                    new_probs.push((new_beam, (base_prob + n_prob) * pr_b, 0.0));
                 }
             }
         }
@@ -90,19 +97,24 @@ fn beam_search_<D: Data<Elem = f32>>(
         let mut last_key: i32 = -1;
         let mut last_key_pos = 0;
         for i in 0..cur_probs.len() {
-            if cur_probs[i].0 == last_key {
-                cur_probs[last_key_pos].1 = cur_probs[last_key_pos].1 + cur_probs[i].1;
-                cur_probs[last_key_pos].2 = cur_probs[last_key_pos].2 + cur_probs[i].2;
+            let cur_prob = cur_probs[i];
+            if cur_prob.0 == last_key {
+                cur_probs[last_key_pos].1 += cur_prob.1;
+                cur_probs[last_key_pos].2 += cur_prob.2;
                 cur_probs[i].0 = -1;
             } else {
                 last_key_pos = i;
-                last_key = cur_probs[i].0;
+                last_key = cur_prob.0;
             }
         }
 
         cur_probs.retain(|x| x.0 != -1);
         cur_probs.sort_by(|a, b| (b.1 + b.2).partial_cmp(&(a.1 + a.2)).unwrap());
         cur_probs.truncate(beam_size);
+        if cur_probs.is_empty() {
+            // we've run out of beam (probably the threshold is too high)
+            return (String::new(), Vec::new())
+        }
         let top = cur_probs[0].1 + cur_probs[0].2;
         for mut x in &mut cur_probs {
             x.1 /= top;
