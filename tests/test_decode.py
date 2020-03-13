@@ -28,12 +28,54 @@ class Tests(TestCase):
         self.assertEqual(len(seq), len(path))
         self.assertEqual(len(set(seq)), len(self.alphabet) - 1)
 
+    def test_zero_beam_size(self):
+        """ simple beam search test with zero beam size"""
+        with self.assertRaises(ValueError):
+            beam_search(self.probs, self.alphabet, 0, self.beam_cut_threshold)
+
+    def test_zero_beam_cut_threshold(self):
+        """ simple beam search test with beam cut threshold of 0.0"""
+        seq, path = beam_search(self.probs, self.alphabet, self.beam_size, 0.0)
+        self.assertEqual(len(seq), len(path))
+        self.assertEqual(len(set(seq)), len(self.alphabet) - 1)
+
+    def test_negative_beam_cut_threshold(self):
+        """ simple beam search test with beam cut threshold below 0.0"""
+        seq, path = beam_search(self.probs, self.alphabet, self.beam_size, -0.1)
+        self.assertEqual(len(seq), len(path))
+        self.assertEqual(len(set(seq)), len(self.alphabet) - 1)
+
+    def test_max_beam_cut_threshold(self):
+        """ simple beam search test with beam cut threshold of 1.0"""
+        seq, path = beam_search(self.probs, self.alphabet, self.beam_size, 1.0)
+        self.assertEqual(len(seq), len(path))
+        self.assertEqual(len(seq), 0) # with a threshold that high, we won't find anything
+
+    def test_high_beam_cut_threshold(self):
+        """ simple beam search test with beam cut threshold above 1.0"""
+        seq, path = beam_search(self.probs, self.alphabet, self.beam_size, 1.1)
+        self.assertEqual(len(seq), len(path))
+        self.assertEqual(len(seq), 0) # with a threshold that high, we won't find anything
+
+    def test_beam_search_mismatched_alphabet_short(self):
+        """ simple beam search test with too few alphabet chars"""
+        alphabet = "NAGC"
+        with self.assertRaises(ValueError):
+            beam_search(self.probs, alphabet, self.beam_size, self.beam_cut_threshold)
+
+    def test_beam_search_mismatched_alphabet_long(self):
+        """ simple beam search test with too many alphabet chars"""
+        alphabet = "NAGCTX"
+        with self.assertRaises(ValueError):
+            beam_search(self.probs, alphabet, self.beam_size, self.beam_cut_threshold)
+
     def test_beam_search_short_alphabet(self):
         """ simple beam search test with short alphabet"""
-        alphabet = "NAG"
-        seq, path = beam_search(self.probs, alphabet, self.beam_size, self.beam_cut_threshold)
+        self.alphabet = "NAG"
+        self.probs = self.get_random_data()
+        seq, path = beam_search(self.probs, self.alphabet, self.beam_size, self.beam_cut_threshold)
         self.assertEqual(len(seq), len(path))
-        self.assertEqual(len(set(seq)), len(alphabet) - 1)
+        self.assertEqual(len(set(seq)), len(self.alphabet) - 1)
 
     def test_beam_search_long_alphabet(self):
         """ simple beam search test with long alphabet"""
