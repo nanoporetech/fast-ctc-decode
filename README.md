@@ -15,7 +15,7 @@ $ pip install fast-ctc-decode
 >>>
 >>> beam_size = 5
 >>> alphabet = "NACGT"
->>> beam_prune_threshold = 0.1  # < 1 / len(alphabet)
+>>> beam_prune_threshold = 0.1
 >>> posteriors = np.random.rand(100, len(alphabet)).astype(np.float32)
 >>>
 >>> seq, path = beam_search(posteriors, alphabet, beam_size, beam_prune_threshold)
