@@ -3,11 +3,11 @@
 #[macro_use(s)]
 extern crate ndarray;
 
-use numpy::PyArray2;
 use ndarray::{ArrayBase, Data, Ix2};
+use numpy::PyArray2;
 
-use pyo3::prelude::*;
 use pyo3::exceptions::ValueError;
+use pyo3::prelude::*;
 use pyo3::wrap_pyfunction;
 
 #[pyfunction]
@@ -18,11 +18,18 @@ fn beam_search(
     beam_cut_threshold: f32,
 ) -> PyResult<(String, Vec<usize>)> {
     if alphabet.len() != result.shape()[1] {
-        Err(ValueError::py_err("alphabet size does not match probability matrix dimensions"))
+        Err(ValueError::py_err(
+            "alphabet size does not match probability matrix dimensions",
+        ))
     } else if beam_size == 0 {
         Err(ValueError::py_err("beam_size cannot be 0"))
     } else {
-        Ok(beam_search_(&result.as_array(), alphabet, beam_size, beam_cut_threshold))
+        Ok(beam_search_(
+            &result.as_array(),
+            alphabet,
+            beam_size,
+            beam_cut_threshold,
+        ))
     }
 }
 
@@ -38,7 +45,6 @@ fn beam_search_<D: Data<Elem = f32>>(
     beam_size: usize,
     beam_cut_threshold: f32,
 ) -> (String, Vec<usize>) {
-
     let alphabet: Vec<char> = alphabet.chars().collect();
 
     // alphabet_size minus the blank label
@@ -63,7 +69,7 @@ fn beam_search_<D: Data<Elem = f32>>(
                 new_probs.push((beam, 0.0, (n_prob + base_prob) * pr[0]));
             }
 
-            for (b,&pr_b) in (1..alphabet_size + 1).zip(pr.iter().skip(1)) {
+            for (b, &pr_b) in (1..=alphabet_size).zip(pr.iter().skip(1)) {
                 if pr_b < beam_cut_threshold {
                     continue;
                 }
@@ -113,7 +119,7 @@ fn beam_search_<D: Data<Elem = f32>>(
         cur_probs.truncate(beam_size);
         if cur_probs.is_empty() {
             // we've run out of beam (probably the threshold is too high)
-            return (String::new(), Vec::new())
+            return (String::new(), Vec::new());
         }
         let top = cur_probs[0].1 + cur_probs[0].2;
         for mut x in &mut cur_probs {
