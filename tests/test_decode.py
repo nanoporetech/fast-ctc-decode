@@ -14,7 +14,8 @@ class Tests(TestCase):
         self.probs = self.get_random_data()
 
     def get_random_data(self, samples=100):
-        return np.random.rand(samples, len(self.alphabet)).astype(np.float32)
+        x = np.random.rand(samples, len(self.alphabet)).astype(np.float32)
+        return x / np.linalg.norm(x, ord=2, axis=1, keepdims=True)
 
     def test_beam_search(self):
         """ simple beam search test with the canonical alphabet"""
