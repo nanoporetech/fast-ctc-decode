@@ -3,6 +3,7 @@
 #[macro_use(s)]
 extern crate ndarray;
 
+use ndarray::Array2;
 use numpy::PyArray2;
 
 use pyo3::exceptions::{RuntimeError, ValueError};
@@ -12,6 +13,7 @@ use pyo3::wrap_pyfunction;
 use std::fmt;
 
 mod search;
+mod search2d;
 mod tree;
 mod vec2d;
 
@@ -98,7 +100,7 @@ fn beam_search(
     let max_beam_cut = 1.0 / (alphabet.len() as f32);
     if alphabet.len() != network_output.shape()[1] {
         Err(ValueError::py_err(format!(
-            "alphabet size {} does not match probability matrix dimensions {}",
+            "alphabet size {} does not match probability matrix inner dimension {}",
             alphabet.len(),
             network_output.shape()[1]
         )))
@@ -124,9 +126,111 @@ fn beam_search(
     }
 }
 
+/// Perform a CTC beam search decode on two RNN outputs that describe the same sequence.
+///
+/// This is a variation of `beam_search` that attempts to find a common labelling for two RNN
+/// outputs. This could be the same network run over two different samplings of the same sequence,
+/// or two different networks run over the same input, for example.
+///
+/// Args:
+///     network_output_1 (numpy.ndarray): The 2D array output of the neural network. Must be the
+///         output of a softmax layer, with values between 0.0 and 1.0 representing probabilities.
+///         The first (outer) axis is time, and the second (inner) axis is label. The first entry
+///         on the label axis is the blank label.
+///     network_output_2 (numpy.ndarray): The second neural network output. The same constraints
+///         apply as to `network_output_1`. Additionally, the inner axis size must be the same as
+///         that of `network_output_1` (but the outer axis can be a different size).
+///     alphabet (str): The labels (including the blank label) in the order given on the label axis
+///         of `network_output`. Length must match the size of the inner axis of
+///         `network_output_1` and `network_output_2`.
+///     envelope (numpy.ndarray, optional): An Nx2 array, where N is the outer axis length of
+///         `network_output_1`. For each row of `network_output_1`, this gives the starting and
+///         ending rows of `network_output_2` to consider for alignment.
+///     beam_size (int): How many suffix_tree should be kept at each step. Higher numbers are less
+///         likely to discard the true labelling, but also make it slower and more memory
+///         intensive. Must be at least 1.
+///     beam_cut_threshold (float): Ignore any entries in `network_output` below this value. Must
+///         be at least 0.0, and less than ``1/len(alphabet)``.
+///
+/// Returns:
+///     str: The decoded sequence.
+///
+/// Raises:
+///     ValueError: The constraints on the arguments have not been met.
+#[pyfunction(beam_size = "5", beam_cut_threshold = "0.0", envelope = "None")]
+#[text_signature = "(network_output_1, network_output_2, alphabet, envelope=None, beam_size=5, beam_cut_threshold=0.0)"]
+fn beam_search_2d(
+    network_output_1: &PyArray2<f32>,
+    network_output_2: &PyArray2<f32>,
+    alphabet: &PySequence,
+    envelope: Option<&PyArray2<usize>>,
+    beam_size: usize,
+    beam_cut_threshold: f32,
+) -> PyResult<String> {
+    let alphabet: Vec<String> = alphabet.tuple()?.iter().map(|x| x.to_string()).collect();
+    let max_beam_cut = 1.0 / (alphabet.len() as f32);
+    if network_output_1.shape()[1] != network_output_2.shape()[1] {
+        Err(ValueError::py_err(
+            "inner axes of the network outputs do not match",
+        ))
+    } else if alphabet.len() != network_output_1.shape()[1] {
+        Err(ValueError::py_err(format!(
+            "alphabet size {} does not match probability matrix inner dimension {}",
+            alphabet.len(),
+            network_output_1.shape()[1]
+        )))
+    } else if beam_size == 0 {
+        Err(ValueError::py_err("beam_size cannot be 0"))
+    } else if beam_cut_threshold < -0.0 {
+        Err(ValueError::py_err(
+            "beam_cut_threshold must be at least 0.0",
+        ))
+    } else if beam_cut_threshold >= max_beam_cut {
+        Err(ValueError::py_err(format!(
+            "beam_cut_threshold cannot be more than {}",
+            max_beam_cut
+        )))
+    } else {
+        if let Some(env) = envelope {
+            if env.shape()[0] != network_output_1.shape()[0] {
+                return Err(ValueError::py_err(
+                    "the lengths of network_output_1 and envelope do not match",
+                ));
+            } else if env.shape()[1] != 2 {
+                return Err(ValueError::py_err(
+                    "the inner axis of envelope must have size 2",
+                ));
+            }
+        }
+        // if we need to construct an envelope, this holds it in scope while we're using it
+        let default_envelope;
+        let envelope_view = match envelope {
+            Some(env) => env.as_array(),
+            None => {
+                default_envelope =
+                    Array2::from_shape_fn((network_output_1.shape()[0], 2), |p| match p {
+                        (_, 0) => 0,
+                        (_, _) => network_output_2.shape()[0],
+                    });
+                default_envelope.view()
+            }
+        };
+        search2d::beam_search(
+            &network_output_1.as_array(),
+            &network_output_2.as_array(),
+            &alphabet,
+            &envelope_view,
+            beam_size,
+            beam_cut_threshold,
+        )
+        .map_err(|e| RuntimeError::py_err(format!("{}", e)))
+    }
+}
+
 /// Methods for labelling RNN results using CTC decoding.
 #[pymodule]
 fn fast_ctc_decode(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(beam_search))?;
+    m.add_wrapped(wrap_pyfunction!(beam_search_2d))?;
     Ok(())
 }

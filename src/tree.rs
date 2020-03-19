@@ -64,6 +64,27 @@ impl<'a, T: Copy> Iterator for SuffixTreeIter<'a, T> {
     }
 }
 
+pub struct SuffixTreeIterNoData<'a, T> {
+    nodes: &'a Vec<LabelNode<T>>,
+    next: i32,
+}
+
+impl<'a, T> Iterator for SuffixTreeIterNoData<'a, T> {
+    type Item = usize;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.next >= 0 {
+            // NB: we could use an unsafe deref here as we maintain the invariant that
+            // next <= nodes.len()
+            let node = &self.nodes[self.next as usize];
+            self.next = node.parent;
+            Some(node.label)
+        } else {
+            None
+        }
+    }
+}
+
 pub const ROOT_NODE: i32 = -1;
 
 impl<T> SuffixTree<T> {
@@ -120,6 +141,22 @@ impl<T> SuffixTree<T> {
         }
         None
     }
+
+    pub fn get_data_ref(&self, node: i32) -> Option<&T> {
+        if node >= 0 && (node as usize) < self.nodes.len() {
+            Some(&self.nodes[node as usize].data)
+        } else {
+            None
+        }
+    }
+
+    pub fn iter_from_no_data(&self, node: i32) -> SuffixTreeIterNoData<T> {
+        assert!((node as usize) < self.nodes.len());
+        SuffixTreeIterNoData {
+            nodes: &self.nodes,
+            next: node,
+        }
+    }
 }
 
 impl<T: Copy> SuffixTree<T> {
@@ -141,50 +178,66 @@ mod tests {
         let mut tree = SuffixTree::new(2);
         assert_eq!(tree.get_child(-1, 0), None);
         assert_eq!(tree.get_child(-1, 1), None);
+        assert_eq!(tree.get_data_ref(-1), None);
         assert_eq!(tree.label(-1), None);
 
         assert_eq!(tree.add_node(-1, 0, 100), 0);
         assert_eq!(tree.get_child(-1, 0), Some(0));
+        assert_eq!(tree.get_data_ref(0), Some(&100));
         assert_eq!(tree.label(0), Some(0));
 
         assert_eq!(tree.add_node(-1, 1, 101), 1);
         assert_eq!(tree.get_child(-1, 1), Some(1));
+        assert_eq!(tree.get_data_ref(1), Some(&101));
         assert_eq!(tree.label(1), Some(1));
 
         assert_eq!(tree.add_node(0, 0, 102), 2);
         assert_eq!(tree.get_child(0, 0), Some(2));
+        assert_eq!(tree.get_data_ref(2), Some(&102));
         assert_eq!(tree.label(2), Some(0));
 
         assert_eq!(tree.add_node(0, 1, 103), 3);
         assert_eq!(tree.get_child(0, 1), Some(3));
+        assert_eq!(tree.get_data_ref(3), Some(&103));
         assert_eq!(tree.label(3), Some(1));
 
         assert_eq!(tree.add_node(3, 1, 104), 4);
         assert_eq!(tree.get_child(3, 1), Some(4));
+        assert_eq!(tree.get_data_ref(4), Some(&104));
         assert_eq!(tree.label(4), Some(1));
 
         assert_eq!(tree.add_node(1, 0, 105), 5);
         assert_eq!(tree.get_child(1, 0), Some(5));
+        assert_eq!(tree.get_data_ref(5), Some(&105));
         assert_eq!(tree.label(5), Some(0));
 
         // everything still unchanged
         assert_eq!(tree.label(-1), None);
         assert_eq!(tree.get_child(-1, 0), Some(0));
+        assert_eq!(tree.get_data_ref(0), Some(&100));
         assert_eq!(tree.label(0), Some(0));
         assert_eq!(tree.get_child(-1, 1), Some(1));
+        assert_eq!(tree.get_data_ref(1), Some(&101));
         assert_eq!(tree.label(1), Some(1));
         assert_eq!(tree.get_child(0, 0), Some(2));
+        assert_eq!(tree.get_data_ref(2), Some(&102));
         assert_eq!(tree.label(2), Some(0));
         assert_eq!(tree.get_child(0, 1), Some(3));
+        assert_eq!(tree.get_data_ref(3), Some(&103));
         assert_eq!(tree.label(3), Some(1));
         assert_eq!(tree.get_child(1, 0), Some(5));
+        assert_eq!(tree.get_data_ref(5), Some(&105));
         assert_eq!(tree.label(5), Some(0));
         assert_eq!(tree.get_child(1, 1), None);
         assert_eq!(tree.get_child(2, 0), None);
         assert_eq!(tree.get_child(2, 1), None);
         assert_eq!(tree.get_child(3, 0), None);
         assert_eq!(tree.get_child(3, 1), Some(4));
+        assert_eq!(tree.get_data_ref(4), Some(&104));
         assert_eq!(tree.label(4), Some(1));
+
+        let ancestor_labels: Vec<usize> = tree.iter_from_no_data(4).collect();
+        assert_eq!(ancestor_labels, vec![1, 1, 0]);
 
         let ancestor_label_and_data: Vec<(usize, i32)> = tree.iter_from(4).collect();
         assert_eq!(ancestor_label_and_data, vec![(1, 104), (1, 103), (0, 100)]);

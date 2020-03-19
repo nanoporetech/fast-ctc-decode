@@ -2,11 +2,10 @@
 
 import numpy as np
 from unittest import TestCase, main
-from fast_ctc_decode import beam_search
+from fast_ctc_decode import *
 
 
-class Tests(TestCase):
-
+class Test1DBeamSearch(TestCase):
     def setUp(self):
         self.beam_size = 5
         self.alphabet = "NACGT"
@@ -101,7 +100,7 @@ class Tests(TestCase):
     def test_nans(self):
         """beam_search is passed NaN values"""
         self.probs.fill(np.NaN)
-        with self.assertRaisesRegexp(RuntimeError, "Failed to compare values"):
+        with self.assertRaisesRegex(RuntimeError, "Failed to compare values"):
             beam_search(self.probs, self.alphabet)
 
     def test_beam_search_short_alphabet(self):
@@ -187,6 +186,62 @@ class Tests(TestCase):
         self.assertEqual(seq, 'AAA')
         self.assertEqual(len(seq), len(path))
         self.assertEqual(path, expected_path)
+
+class Test2DBeamSearch(TestCase):
+    def setUp(self):
+        self.beam_size = 5
+        self.alphabet = "NACGT"
+        self.beam_cut_threshold = 0.1
+        self.probs_1 = self.get_random_data()
+        self.probs_2 = self.get_random_data()
+
+    def get_random_data(self, samples=100):
+        x = np.random.rand(samples, len(self.alphabet)).astype(np.float32)
+        return x / np.linalg.norm(x, ord=2, axis=1, keepdims=True)
+
+    def test_nans(self):
+        """beam_search_2d is passed NaN values"""
+        self.probs_1.fill(np.NaN)
+        with self.assertRaisesRegex(RuntimeError, "Failed to compare values"):
+            beam_search_2d(self.probs_1, self.probs_2, self.alphabet)
+
+    def test_identical_data(self):
+        """Test 2D beam search on the same data twice"""
+        x = np.array([
+            [0.01, 0.98, 0.01],
+            [0.01, 0.98, 0.01],
+            [0.01, 0.98, 0.01],
+            [0.01, 0.98, 0.01],
+            [0.9,  0.05, 0.05],
+            [0.7,  0.05, 0.35],
+            [0.9,  0.05, 0.05],
+            [0.01, 0.98, 0.01],
+            [0.01, 0.98, 0.01],
+            [0.01, 0.98, 0.01],
+            [0.01, 0.01, 0.98],
+            [0.01, 0.01, 0.98],
+            [0.01, 0.01, 0.98],
+            [0.01, 0.01, 0.98],
+        ], np.float32)
+        seq = beam_search_2d(x, x, "NAB")
+        self.assertEqual("AAB", seq)
+
+    def test_disagreeing_data(self):
+        """Test 2D beam search on data that disagrees"""
+        x = np.array([
+            [0.01, 0.98, 0.01],
+            [0.01, 0.34, 0.65],
+            [0.01, 0.98, 0.01],
+            [0.01, 0.01, 0.98],
+        ], np.float32)
+        self.assertEqual("ABAB", beam_search(x, "NAB")[0])
+        y = np.array([
+            [0.0, 1.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 0.0, 1.0],
+        ], np.float32)
+        self.assertEqual("AB", beam_search_2d(x, y, "NAB"))
 
 
 if __name__ == '__main__':
