@@ -10,6 +10,9 @@ use pyo3::exceptions::ValueError;
 use pyo3::prelude::*;
 use pyo3::wrap_pyfunction;
 
+mod vec2d;
+use crate::vec2d::Vec2D;
+
 /// Perform a CTC beam search decode on an RNN output.
 ///
 /// The ultimate aim here is to find a way of labelling some input data. In the case of nanopore
@@ -139,6 +142,8 @@ fn beam_search_<D: Data<Elem = f32>>(
         next: 0,
         time: 0,
     }];
+    // suffix_children is a 2D array.
+    //
     // Invariants:
     //
     // suffix_tree.len() == suffix_children.len()
@@ -150,7 +155,8 @@ fn beam_search_<D: Data<Elem = f32>>(
     // For all n > 0:
     //     suffix_children[suffix_tree[n].next][suffix_tree[n].label] == n
     //     (the parent node has a child edge back to this node labelled correctly)
-    let mut suffix_children: Vec<Vec<i32>> = vec![vec![-1; alphabet_size]];
+    let mut suffix_children: Vec2D<i32> = Vec2D::new(alphabet_size);
+    suffix_children.add_row_with_value(-1);
     let mut beam = vec![SearchPoint {
         node: 0,
         label_prob: 0.0,
@@ -189,7 +195,7 @@ fn beam_search_<D: Data<Elem = f32>>(
                         label_prob: label_prob * pr_b,
                         gap_prob: 0.0,
                     });
-                    let mut new_node_idx = suffix_children[node as usize][label - 1];
+                    let mut new_node_idx = suffix_children[[node as usize, label - 1]];
                     if new_node_idx == -1 && gap_prob > 0.0 {
                         new_node_idx = suffix_tree.len() as i32;
                         suffix_tree.push(LabelNode {
@@ -197,8 +203,8 @@ fn beam_search_<D: Data<Elem = f32>>(
                             next: node,
                             time: fidx,
                         });
-                        suffix_children[node as usize][label - 1] = new_node_idx;
-                        suffix_children.push(vec![-1; alphabet_size]);
+                        suffix_children[[node as usize, label - 1]] = new_node_idx;
+                        suffix_children.add_row_with_value(-1);
                     }
 
                     next_beam.push(SearchPoint {
@@ -207,7 +213,7 @@ fn beam_search_<D: Data<Elem = f32>>(
                         gap_prob: 0.0,
                     });
                 } else {
-                    let mut new_node_idx = suffix_children[node as usize][label - 1];
+                    let mut new_node_idx = suffix_children[[node as usize, label - 1]];
                     if new_node_idx == -1 {
                         new_node_idx = suffix_tree.len() as i32;
                         suffix_tree.push(LabelNode {
@@ -215,8 +221,8 @@ fn beam_search_<D: Data<Elem = f32>>(
                             next: node,
                             time: fidx,
                         });
-                        suffix_children[node as usize][label - 1] = new_node_idx;
-                        suffix_children.push(vec![-1; alphabet_size]);
+                        suffix_children[[node as usize, label - 1]] = new_node_idx;
+                        suffix_children.add_row_with_value(-1);
                     }
 
                     next_beam.push(SearchPoint {
