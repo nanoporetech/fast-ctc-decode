@@ -23,6 +23,25 @@ class Tests(TestCase):
         self.assertEqual(len(seq), len(path))
         self.assertEqual(len(set(seq)), len(self.alphabet) - 1)
 
+    def test_beam_search(self):
+        """ simple beam search test with named arguments"""
+        seq, path = beam_search(network_output=self.probs, alphabet=self.alphabet,
+                                beam_size=self.beam_size,
+                                beam_cut_threshold=self.beam_cut_threshold)
+        self.assertEqual(len(seq), len(path))
+        self.assertEqual(len(set(seq)), len(self.alphabet) - 1)
+
+    def test_beam_search_not_enough_args(self):
+        """ simple beam search test with not enough arguments"""
+        with self.assertRaises(TypeError):
+            beam_search(self.probs)
+
+    def test_beam_search_defaults(self):
+        """ simple beam search test using argument defaults"""
+        seq, path = beam_search(self.probs, self.alphabet)
+        self.assertEqual(len(seq), len(path))
+        self.assertEqual(len(set(seq)), len(self.alphabet) - 1)
+
     def test_beam_search_alphabet(self):
         """ simple beam search test with different alphabet"""
         seq, path = beam_search(self.probs, "NRUST", self.beam_size, self.beam_cut_threshold)
@@ -42,21 +61,18 @@ class Tests(TestCase):
 
     def test_negative_beam_cut_threshold(self):
         """ simple beam search test with beam cut threshold below 0.0"""
-        seq, path = beam_search(self.probs, self.alphabet, self.beam_size, -0.1)
-        self.assertEqual(len(seq), len(path))
-        self.assertEqual(len(set(seq)), len(self.alphabet) - 1)
+        with self.assertRaises(ValueError):
+            beam_search(self.probs, self.alphabet, self.beam_size, -0.1)
 
-    def test_max_beam_cut_threshold(self):
-        """ simple beam search test with beam cut threshold of 1.0"""
-        seq, path = beam_search(self.probs, self.alphabet, self.beam_size, 1.0)
-        self.assertEqual(len(seq), len(path))
-        self.assertEqual(len(seq), 0) # with a threshold that high, we won't find anything
+    def test_beam_cut_threshold_boundary(self):
+        """ simple beam search test with beam cut threshold of 1/len(alphabet)"""
+        with self.assertRaises(ValueError):
+            beam_search(self.probs, self.alphabet, self.beam_size, 1.0/len(self.alphabet))
 
     def test_high_beam_cut_threshold(self):
-        """ simple beam search test with beam cut threshold above 1.0"""
-        seq, path = beam_search(self.probs, self.alphabet, self.beam_size, 1.1)
-        self.assertEqual(len(seq), len(path))
-        self.assertEqual(len(seq), 0) # with a threshold that high, we won't find anything
+        """ simple beam search test with very high beam cut threshold"""
+        with self.assertRaises(ValueError):
+            beam_search(self.probs, self.alphabet, self.beam_size, 1.1)
 
     def test_beam_search_mismatched_alphabet_short(self):
         """ simple beam search test with too few alphabet chars"""
@@ -82,7 +98,7 @@ class Tests(TestCase):
         """ simple beam search test with long alphabet"""
         self.alphabet = "NABCDEFGHIJK"
         self.probs = self.get_random_data(10000)
-        seq, path = beam_search(self.probs, self.alphabet, self.beam_size, self.beam_cut_threshold)
+        seq, path = beam_search(self.probs, self.alphabet, self.beam_size, beam_cut_threshold=0.0)
         self.assertEqual(len(seq), len(path))
         self.assertEqual(len(set(seq)), len(self.alphabet) - 1)
 
