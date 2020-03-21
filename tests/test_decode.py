@@ -23,7 +23,7 @@ class Tests(TestCase):
         self.assertEqual(len(seq), len(path))
         self.assertEqual(len(set(seq)), len(self.alphabet) - 1)
 
-    def test_beam_search(self):
+    def test_beam_search_named_args(self):
         """ simple beam search test with named arguments"""
         seq, path = beam_search(network_output=self.probs, alphabet=self.alphabet,
                                 beam_size=self.beam_size,
