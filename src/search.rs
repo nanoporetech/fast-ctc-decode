@@ -1,21 +1,6 @@
 use super::SearchError;
-use crate::vec2d::Vec2D;
+use crate::tree::{SuffixTree, ROOT_NODE};
 use ndarray::{ArrayBase, Data, Ix2};
-
-/// An element in a possible labelling.
-#[derive(Clone, Copy, Debug)]
-struct LabelNode {
-    /// The index into the alphabet of this label.
-    ///
-    /// Note that blanks are not represented by a LabelNode - this is an actual label.
-    label: usize,
-    /// The index of the next LabelNode.
-    ///
-    /// Can also be considered the parent edge in the tree of labelling suffixes.
-    next: i32,
-    /// The last(?) sample to which the label applies.
-    time: usize,
-}
 
 /// A node in the labelling tree to build from.
 #[derive(Clone, Copy, Debug)]
@@ -45,36 +30,13 @@ pub fn beam_search<D: Data<Elem = f32>>(
     beam_size: usize,
     beam_cut_threshold: f32,
 ) -> Result<(String, Vec<usize>), SearchError> {
-    // alphabet_size minus the blank label
+    // alphabet size minus the blank label
     let alphabet_size = alphabet.len() - 1;
     let duration = network_output.nrows();
 
-    // suffix_tree and suffix_children, between them, describe a tree of labelling suffixes
-    // (partial labellings pinned to the end of the network output). Zipping the two vectors
-    // together gives all the nodes in the tree, with the first entry being the root node and the
-    // next field of LabelNode giving the index of each node's parent.
-    let mut suffix_tree = vec![LabelNode {
-        label: 0,
-        next: 0,
-        time: 0,
-    }];
-    // suffix_children is a 2D array.
-    //
-    // Invariants:
-    //
-    // suffix_tree.len() == suffix_children.len()
-    //
-    // For all n, l where suffix_children[n][l] != -1:
-    //     suffix_tree[suffix_children[n][l]].label == l (child edge label matches child label)
-    //     suffix_tree[suffix_children[n][l]].next == n  (child's parent pointer is correct)
-    //
-    // For all n > 0:
-    //     suffix_children[suffix_tree[n].next][suffix_tree[n].label] == n
-    //     (the parent node has a child edge back to this node labelled correctly)
-    let mut suffix_children: Vec2D<i32> = Vec2D::new(alphabet_size);
-    suffix_children.add_row_with_value(-1);
+    let mut suffix_tree = SuffixTree::new(alphabet_size);
     let mut beam = vec![SearchPoint {
-        node: 0,
+        node: ROOT_NODE,
         label_prob: 0.0,
         gap_prob: 1.0,
     }];
@@ -92,6 +54,7 @@ pub fn beam_search<D: Data<Elem = f32>>(
             gap_prob,
         } in &beam
         {
+            let tip_label = suffix_tree.label(node);
             // add N to beam
             if pr[0] > beam_cut_threshold {
                 next_beam.push(SearchPoint {
@@ -101,45 +64,35 @@ pub fn beam_search<D: Data<Elem = f32>>(
                 });
             }
 
-            for (label, &pr_b) in (1..=alphabet_size).zip(pr.iter().skip(1)) {
+            for (label, &pr_b) in pr.iter().skip(1).enumerate() {
                 if pr_b < beam_cut_threshold {
                     continue;
                 }
-                if label == suffix_tree[node as usize].label {
+                if Some(label) == tip_label {
                     next_beam.push(SearchPoint {
                         node,
                         label_prob: label_prob * pr_b,
                         gap_prob: 0.0,
                     });
-                    let mut new_node_idx = suffix_children[[node as usize, label - 1]];
-                    if new_node_idx == -1 && gap_prob > 0.0 {
-                        new_node_idx = suffix_tree.len() as i32;
-                        suffix_tree.push(LabelNode {
-                            label: label,
-                            next: node,
-                            time: fidx,
-                        });
-                        suffix_children[[node as usize, label - 1]] = new_node_idx;
-                        suffix_children.add_row_with_value(-1);
-                    }
-
-                    next_beam.push(SearchPoint {
-                        node: new_node_idx,
-                        label_prob: gap_prob * pr_b,
-                        gap_prob: 0.0,
+                    let new_node_idx = suffix_tree.get_child(node, label).or_else(|| {
+                        if gap_prob > 0.0 {
+                            Some(suffix_tree.add_node(node, label, fidx))
+                        } else {
+                            None
+                        }
                     });
-                } else {
-                    let mut new_node_idx = suffix_children[[node as usize, label - 1]];
-                    if new_node_idx == -1 {
-                        new_node_idx = suffix_tree.len() as i32;
-                        suffix_tree.push(LabelNode {
-                            label: label,
-                            next: node,
-                            time: fidx,
+
+                    if let Some(idx) = new_node_idx {
+                        next_beam.push(SearchPoint {
+                            node: idx,
+                            label_prob: gap_prob * pr_b,
+                            gap_prob: 0.0,
                         });
-                        suffix_children[[node as usize, label - 1]] = new_node_idx;
-                        suffix_children.add_row_with_value(-1);
                     }
+                } else {
+                    let new_node_idx = suffix_tree
+                        .get_child(node, label)
+                        .unwrap_or_else(|| suffix_tree.add_node(node, label, fidx));
 
                     next_beam.push(SearchPoint {
                         node: new_node_idx,
@@ -151,22 +104,23 @@ pub fn beam_search<D: Data<Elem = f32>>(
         }
         std::mem::swap(&mut beam, &mut next_beam);
 
+        const DELETE_MARKER: i32 = i32::min_value();
         beam.sort_by_key(|x| x.node);
-        let mut last_key: i32 = -1;
+        let mut last_key = DELETE_MARKER;
         let mut last_key_pos = 0;
         for i in 0..beam.len() {
             let beam_item = beam[i];
             if beam_item.node == last_key {
                 beam[last_key_pos].label_prob += beam_item.label_prob;
                 beam[last_key_pos].gap_prob += beam_item.gap_prob;
-                beam[i].node = -1;
+                beam[i].node = DELETE_MARKER;
             } else {
                 last_key_pos = i;
                 last_key = beam_item.node;
             }
         }
 
-        beam.retain(|x| x.node != -1);
+        beam.retain(|x| x.node != DELETE_MARKER);
         let mut has_nans = false;
         beam.sort_unstable_by(|a, b| {
             (b.probability())
@@ -191,15 +145,12 @@ pub fn beam_search<D: Data<Elem = f32>>(
         }
     }
 
-    let mut node_idx = beam[0].node;
     let mut path = Vec::new();
     let mut sequence = String::new();
 
-    while node_idx != 0 {
-        let node = &suffix_tree[node_idx as usize];
-        path.push(node.time);
-        sequence.push_str(&alphabet[node.label]);
-        node_idx = node.next;
+    for (label, time) in suffix_tree.iter_from(beam[0].node) {
+        path.push(time);
+        sequence.push_str(&alphabet[label + 1]);
     }
 
     Ok((sequence, path))

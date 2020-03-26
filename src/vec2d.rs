@@ -26,16 +26,16 @@ where
     }
 }
 
-impl<T> Index<[usize; 2]> for Vec2D<T> {
+impl<T> Index<(usize, usize)> for Vec2D<T> {
     type Output = T;
 
-    fn index(&self, index: [usize; 2]) -> &Self::Output {
-        &self.vec[index[0] * self.inner_size + index[1]]
+    fn index(&self, (outer, inner): (usize, usize)) -> &Self::Output {
+        &self.vec[outer * self.inner_size + inner]
     }
 }
 
-impl<T> IndexMut<[usize; 2]> for Vec2D<T> {
-    fn index_mut(&mut self, index: [usize; 2]) -> &mut Self::Output {
-        &mut self.vec[index[0] * self.inner_size + index[1]]
+impl<T> IndexMut<(usize, usize)> for Vec2D<T> {
+    fn index_mut(&mut self, (outer, inner): (usize, usize)) -> &mut Self::Output {
+        &mut self.vec[outer * self.inner_size + inner]
     }
 }

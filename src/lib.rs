@@ -12,6 +12,7 @@ use pyo3::wrap_pyfunction;
 use std::fmt;
 
 mod search;
+mod tree;
 mod vec2d;
 
 #[derive(Clone, Copy, Debug)]
@@ -59,11 +60,11 @@ impl std::error::Error for SearchError {}
 /// want the most likely labelling.
 ///
 /// The paper mentioned above provides recursive equations that give an efficient way to find the
-/// probability for a specific labelling. The possible suffix_tree, together with their
-/// probabilities, can be built up by starting at one end and trying every possible label at each
-/// stage. The "beam" part of the search is how we keep the search space managable - at each step,
-/// we discard all but the most-probable suffix_tree (like searching with a torch beam). This means
-/// we may not actually find the most likely labelling, but it often works very well.
+/// probability for a specific labelling. A tree of possible labelling suffixes, together with
+/// their probabilities, can be built up by starting at one end and trying every possible label at
+/// each stage. The "beam" part of the search is how we keep the search space managable - at each
+/// step, we ignore all but the most-probable tree leaves (like searching with a torch beam). This
+/// means we may not actually find the most likely labelling, but it often works very well.
 ///
 /// Args:
 ///     network_output (numpy.ndarray): The 2D array output of the neural network. Must be the
@@ -71,9 +72,10 @@ impl std::error::Error for SearchError {}
 ///         The first (outer) axis is time, and the second (inner) axis is label. The first entry
 ///         on the label axis is the blank label.
 ///     alphabet (sequence): The labels (including the blank label) in the order given on the label
-///          axis of `network_output`. Length must match the size of the inner axis of `network_output`.
-///     beam_size (int): How many suffix_tree should be kept at each step. Higher numbers are less
-///         likely to discard the true labelling, but also make it slower and more memory
+///          axis of `network_output`. Length must match the size of the inner axis of
+///          `network_output`.
+///     beam_size (int): How many search points should be kept at each step. Higher numbers are
+///         less likely to discard the true labelling, but also make it slower and more memory
 ///         intensive. Must be at least 1.
 ///     beam_cut_threshold (float): Ignore any entries in `network_output` below this value. Must
 ///         be at least 0.0, and less than ``1/len(alphabet)``.
