@@ -40,11 +40,10 @@ impl SearchPoint {
 
 pub fn beam_search<D: Data<Elem = f32>>(
     network_output: &ArrayBase<D, Ix2>,
-    alphabet: String,
+    alphabet: &Vec<String>,
     beam_size: usize,
     beam_cut_threshold: f32,
 ) -> Option<(String, Vec<usize>)> {
-    let alphabet: Vec<char> = alphabet.chars().collect();
 
     // alphabet_size minus the blank label
     let alphabet_size = alphabet.len() - 1;
@@ -188,7 +187,7 @@ pub fn beam_search<D: Data<Elem = f32>>(
     while node_idx != 0 {
         let node = &suffix_tree[node_idx as usize];
         path.push(node.time);
-        sequence.push(alphabet[node.label]);
+        sequence.push_str(&alphabet[node.label]);
         node_idx = node.next;
     }
 

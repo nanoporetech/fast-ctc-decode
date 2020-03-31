@@ -23,6 +23,18 @@ class Tests(TestCase):
         self.assertEqual(len(seq), len(path))
         self.assertEqual(len(set(seq)), len(self.alphabet) - 1)
 
+    def test_beam_search_list(self):
+        """ simple beam search test with the canonical alphabet as a list"""
+        seq, path = beam_search(self.probs, list(self.alphabet), self.beam_size, self.beam_cut_threshold)
+        self.assertEqual(len(seq), len(path))
+        self.assertEqual(len(set(seq)), len(self.alphabet) - 1)
+
+    def test_beam_search_tuple(self):
+        """ simple beam search test with the canonical alphabet as a tuple"""
+        seq, path = beam_search(self.probs, tuple(self.alphabet), self.beam_size, self.beam_cut_threshold)
+        self.assertEqual(len(seq), len(path))
+        self.assertEqual(len(set(seq)), len(self.alphabet) - 1)
+
     def test_beam_search_named_args(self):
         """ simple beam search test with named arguments"""
         seq, path = beam_search(network_output=self.probs, alphabet=self.alphabet,
@@ -134,7 +146,26 @@ class Tests(TestCase):
         self.assertEqual(len(seq), len(path))
         self.assertEqual(path, expected_path)
 
-    def test_repeat_sequence_path_with_spread(self):
+    def test_repeat_sequence_path_with_multi_char_alpha(self):
+        """ simple beam search path test with a repeated sequence and multi-char alphabet """
+        w = 20
+        self.alphabet = ["N", "AAA", "CCC", "GGG", "TTTT"]
+        x = np.zeros((w, len(self.alphabet)), np.float32)
+        x[:, 0] = 0.5  # set stay prob
+
+        alphabet_idx = 1
+        expected_path = [6, 13, 18]
+        for idx in expected_path:
+            x[idx, 0] = 0.0
+            x[idx, alphabet_idx] = 1.0
+            alphabet_idx += 1
+
+        seq, path = beam_search(x, self.alphabet, self.beam_size, self.beam_cut_threshold)
+
+        self.assertEqual(seq, 'AAACCCGGG')
+        self.assertEqual(path, expected_path)
+
+    def test_repeat_sequence_path_with_spread_probs(self):
         """ simple beam search path test with a repeated sequence with probabilities spread"""
         w = 20
         x = np.zeros((w, len(self.alphabet)), np.float32)
