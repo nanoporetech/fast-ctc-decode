@@ -1,7 +1,11 @@
 #![feature(static_nobundle)]
+#![feature(test)] // benchmarking
 
 #[macro_use(s)]
+#[cfg_attr(test, macro_use(array))]
 extern crate ndarray;
+
+extern crate test; // benchmarking
 
 use ndarray::Array2;
 use numpy::PyArray2;
@@ -37,6 +41,47 @@ impl fmt::Display for SearchError {
 }
 
 impl std::error::Error for SearchError {}
+
+fn seq_to_vec(seq: &PySequence) -> PyResult<Vec<String>> {
+    Ok(seq.tuple()?.iter().map(|x| x.to_string()).collect())
+}
+
+/// Perform a Viterbi search decode on an RNN output.
+///
+/// This is the simplest possible approach to labelling - assign the highest probability label at
+/// each time point.
+///
+/// See the module-level documentation for general requirements on `network_output` and `alphabet`.
+///
+/// Args:
+///     network_output (numpy.ndarray): The 2D array output of the neural network.
+///     alphabet (sequence): The labels (including the blank label, which must be first) in the
+///         order given on the inner axis of `network_output`.
+///
+/// Returns:
+///     tuple of (str, numpy.ndarray): The decoded sequence and an array of the final
+///         timepoints of each label (as indices into the outer axis of `network_output`).
+///
+/// Raises:
+///     ValueError: The constraints on the arguments have not been met.
+#[pyfunction]
+#[text_signature = "(network_output, alphabet)"]
+fn viterbi_search(
+    network_output: &PyArray2<f32>,
+    alphabet: &PySequence,
+) -> PyResult<(String, Vec<usize>)> {
+    let alphabet = seq_to_vec(alphabet)?;
+    if alphabet.is_empty() {
+        Err(ValueError::py_err("Empty alphabet given"))
+    } else if alphabet.len() != network_output.shape()[1] {
+        Err(ValueError::py_err(
+            "alphabet size does not match probability matrix dimensions",
+        ))
+    } else {
+        search::viterbi_search(&network_output.as_array(), &alphabet)
+            .map_err(|e| RuntimeError::py_err(format!("{}", e)))
+    }
+}
 
 /// Perform a CTC beam search decode on an RNN output.
 ///
@@ -76,7 +121,7 @@ fn beam_search(
     beam_size: usize,
     beam_cut_threshold: f32,
 ) -> PyResult<(String, Vec<usize>)> {
-    let alphabet: Vec<String> = alphabet.tuple()?.iter().map(|x| x.to_string()).collect();
+    let alphabet = seq_to_vec(alphabet)?;
     let max_beam_cut = 1.0 / (alphabet.len() as f32);
     if alphabet.len() != network_output.shape()[1] {
         Err(ValueError::py_err(format!(
@@ -143,7 +188,7 @@ fn beam_search_2d(
     beam_size: usize,
     beam_cut_threshold: f32,
 ) -> PyResult<String> {
-    let alphabet: Vec<String> = alphabet.tuple()?.iter().map(|x| x.to_string()).collect();
+    let alphabet = seq_to_vec(alphabet)?;
     let max_beam_cut = 1.0 / (alphabet.len() as f32);
     if network_output_1.shape()[1] != network_output_2.shape()[1] {
         Err(ValueError::py_err(
@@ -244,5 +289,6 @@ fn beam_search_2d(
 fn fast_ctc_decode(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(beam_search))?;
     m.add_wrapped(wrap_pyfunction!(beam_search_2d))?;
+    m.add_wrapped(wrap_pyfunction!(viterbi_search))?;
     Ok(())
 }

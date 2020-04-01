@@ -1,6 +1,6 @@
 use super::SearchError;
 use crate::tree::{SuffixTree, ROOT_NODE};
-use ndarray::{ArrayBase, Data, Ix2};
+use ndarray::{ArrayBase, Data, FoldWhile, Ix2, Zip};
 
 /// A node in the labelling tree to build from.
 #[derive(Clone, Copy, Debug)]
@@ -154,4 +154,126 @@ pub fn beam_search<D: Data<Elem = f32>>(
     }
 
     Ok((sequence, path))
+}
+
+fn find_max(
+    acc: Option<(usize, f32)>,
+    elem_idx: usize,
+    elem_val: &f32,
+) -> FoldWhile<Option<(usize, f32)>> {
+    match acc {
+        Some((_, val)) => {
+            if *elem_val > val {
+                FoldWhile::Continue(Some((elem_idx, *elem_val)))
+            } else {
+                FoldWhile::Continue(acc)
+            }
+        }
+        None => FoldWhile::Continue(Some((elem_idx, *elem_val))),
+    }
+}
+
+pub fn viterbi_search<D: Data<Elem = f32>>(
+    network_output: &ArrayBase<D, Ix2>,
+    alphabet: &[String],
+) -> Result<(String, Vec<usize>), SearchError> {
+    assert!(!alphabet.is_empty());
+    assert!(!network_output.is_empty());
+    assert_eq!(alphabet.len(), network_output.shape()[1]);
+
+    let mut path = Vec::new();
+    let mut sequence = String::new();
+
+    let mut last_label = None;
+    for (idx, pr) in network_output.outer_iter().enumerate() {
+        let (label, _) = Zip::indexed(pr)
+            .fold_while(None, find_max)
+            .into_inner()
+            .unwrap(); // only an empty network_output could give us None
+        if label != 0 && last_label != Some(label) {
+            sequence.push_str(&alphabet[label]);
+            path.push(idx);
+        }
+        last_label = Some(label);
+    }
+
+    Ok((sequence, path))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use test::Bencher;
+
+    #[test]
+    fn test_viterbi() {
+        let alphabet = vec![String::from("N"), String::from("A"), String::from("G")];
+        let network_output = array![
+            [0.0f32, 0.4, 0.6], // G
+            [0.0f32, 0.3, 0.7], // G
+            [0.3f32, 0.3, 0.4], // G
+            [0.4f32, 0.3, 0.3], // N
+            [0.4f32, 0.3, 0.3], // N
+            [0.3f32, 0.3, 0.4], // G
+            [0.1f32, 0.4, 0.5], // G
+            [0.1f32, 0.5, 0.4], // A
+            [0.8f32, 0.1, 0.1], // N
+            [0.1f32, 0.1, 0.8], // G
+        ];
+        let (seq, starts) = viterbi_search(&network_output, &alphabet).unwrap();
+        assert_eq!(seq, "GGAG");
+        assert_eq!(starts, vec![0, 5, 7, 9]);
+    }
+
+    #[test]
+    fn test_viterbi_blank_bounds() {
+        let alphabet = vec![String::from("N"), String::from("A"), String::from("G")];
+        let network_output = array![
+            [0.4f32, 0.3, 0.3], // N
+            [0.4f32, 0.3, 0.3], // N
+            [0.0f32, 0.4, 0.6], // G
+            [0.0f32, 0.3, 0.7], // G
+            [0.3f32, 0.3, 0.4], // G
+            [0.4f32, 0.3, 0.3], // N
+            [0.4f32, 0.3, 0.3], // N
+            [0.3f32, 0.3, 0.4], // G
+            [0.1f32, 0.4, 0.5], // G
+            [0.1f32, 0.5, 0.4], // A
+            [0.8f32, 0.1, 0.1], // N
+            [0.1f32, 0.1, 0.8], // G
+            [0.4f32, 0.3, 0.3], // N
+        ];
+        let (seq, starts) = viterbi_search(&network_output, &alphabet).unwrap();
+        assert_eq!(seq, "GGAG");
+        assert_eq!(starts, vec![2, 7, 9, 11]);
+    }
+
+    // This one is all blanks, and so returns no sequence (which means we're not benchmarking the
+    // construction of the results).
+    #[bench]
+    fn benchmark_trivial_viterbi(b: &mut Bencher) {
+        use ndarray::Array2;
+        let alphabet = vec![String::from("N"), String::from("A"), String::from("G")];
+        let network_output = Array2::from_shape_fn((1000, 3), |p| match p {
+            (_, 0) => 1.0f32,
+            (_, _) => 0.0f32,
+        });
+        b.iter(|| viterbi_search(&network_output, &alphabet));
+    }
+
+    // This one changes label at every data point, so result contruction has the maximum possible
+    // impact on run time.
+    #[bench]
+    fn benchmark_unstable_viterbi(b: &mut Bencher) {
+        use ndarray::Array2;
+        let alphabet = vec![String::from("N"), String::from("A"), String::from("G")];
+        let network_output = Array2::from_shape_fn((1000, 3), |p| match p {
+            (n, 1) if n % 2 == 0 => 0.0f32,
+            (n, 1) if n % 2 != 0 => 1.0f32,
+            (n, 2) if n % 2 == 0 => 1.0f32,
+            (n, 2) if n % 2 != 0 => 0.0f32,
+            _ => 0.0f32,
+        });
+        b.iter(|| viterbi_search(&network_output, &alphabet));
+    }
 }
