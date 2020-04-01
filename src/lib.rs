@@ -7,6 +7,7 @@ use numpy::PyArray2;
 
 use pyo3::exceptions::ValueError;
 use pyo3::prelude::*;
+use pyo3::types::PySequence;
 use pyo3::wrap_pyfunction;
 
 mod search;
@@ -47,8 +48,8 @@ mod vec2d;
 ///         output of a softmax layer, with values between 0.0 and 1.0 representing probabilities.
 ///         The first (outer) axis is time, and the second (inner) axis is label. The first entry
 ///         on the label axis is the blank label.
-///     alphabet (str): The labels (including the blank label) in the order given on the label axis
-///         of `network_output`. Length must match the size of the inner axis of `network_output`.
+///     alphabet (sequence): The labels (including the blank label) in the order given on the label
+///          axis of `network_output`. Length must match the size of the inner axis of `network_output`.
 ///     beam_size (int): How many suffix_tree should be kept at each step. Higher numbers are less
 ///         likely to discard the true labelling, but also make it slower and more memory
 ///         intensive. Must be at least 1.
@@ -65,15 +66,18 @@ mod vec2d;
 #[text_signature = "(network_output, alphabet, beam_size=5, beam_cut_threshold=0.0)"]
 fn beam_search(
     network_output: &PyArray2<f32>,
-    alphabet: String,
+    alphabet: &PySequence,
     beam_size: usize,
     beam_cut_threshold: f32,
 ) -> PyResult<(String, Vec<usize>)> {
+    let alphabet: Vec<String> = alphabet.tuple()?.iter().map(|x| x.to_string()).collect();
     let max_beam_cut = 1.0 / (alphabet.len() as f32);
     if alphabet.len() != network_output.shape()[1] {
-        Err(ValueError::py_err(
-            "alphabet size does not match probability matrix dimensions",
-        ))
+        Err(ValueError::py_err(format!(
+            "alphabet size {} does not match probability matrix dimensions {}",
+            alphabet.len(),
+            network_output.shape()[1]
+        )))
     } else if beam_size == 0 {
         Err(ValueError::py_err("beam_size cannot be 0"))
     } else if beam_cut_threshold < -0.0 {
@@ -88,7 +92,7 @@ fn beam_search(
     } else {
         search::beam_search(
             &network_output.as_array(),
-            alphabet,
+            &alphabet,
             beam_size,
             beam_cut_threshold,
         )
