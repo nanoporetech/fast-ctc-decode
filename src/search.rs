@@ -26,7 +26,7 @@ impl SearchPoint {
 
 pub fn beam_search<D: Data<Elem = f32>>(
     network_output: &ArrayBase<D, Ix2>,
-    alphabet: &Vec<String>,
+    alphabet: &[String],
     beam_size: usize,
     beam_cut_threshold: f32,
 ) -> Result<(String, Vec<usize>), SearchError> {
