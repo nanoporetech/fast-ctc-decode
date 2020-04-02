@@ -157,6 +157,10 @@ fn beam_search(
 /// outputs. This could be the same network run over two different samplings of the same sequence,
 /// or two different networks run over the same input, for example.
 ///
+/// If no envelope is provided, a default one will be used. For now, that will just search the
+/// whole of `network_output_2` at every step, but in future it may calculate a more constrained
+/// envelope. For consistent results, you should provide an envelope.
+///
 /// Args:
 ///     network_output_1 (numpy.ndarray): The 2D array output of the first neural network.
 ///     network_output_2 (numpy.ndarray): The 2D array output of the second neural network. Note
