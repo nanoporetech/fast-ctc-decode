@@ -128,7 +128,11 @@ fn root_probs<D: Data<Elem = f32>>(
     gap_probs: &ArrayBase<D, Ix1>,
     lower_bound: usize,
 ) -> SecondaryProbs {
-    let mut probs = SecondaryProbs::with_offset(lower_bound);
+    let mut probs = SecondaryProbs {
+        offset: lower_bound,
+        probs: Vec::new(),
+        max_prob: 1.0,
+    };
     probs.probs.reserve(1 + gap_probs.len() - lower_bound);
     // this is the only "out of bounds" probability that isn't just zero
     probs.probs.push(ProbPair::with_gap(1.0));
@@ -167,7 +171,7 @@ pub fn beam_search<D: Data<Elem = f32>, E: Data<Elem = usize>>(
         prob_2_max: 1.0,
     }];
     let mut next_beam = Vec::new();
-    let root_secondary_probs = root_probs(
+    let mut root_secondary_probs = root_probs(
         &network_output_2.index_axis(Axis(1), 0),
         envelope[[envelope.nrows() - 1, 0]],
     );
@@ -176,7 +180,7 @@ pub fn beam_search<D: Data<Elem = f32>, E: Data<Elem = usize>>(
     for (labelling_probs, bounds) in network_output_1
         .slice(s![..;-1, ..])
         .outer_iter()
-        .zip(envelope.outer_iter())
+        .zip(envelope.outer_iter().rev())
     {
         let (lower_t, upper_t) = (bounds[0].max(0), bounds[1].min(network_2_len));
         next_beam.clear();
@@ -291,10 +295,20 @@ pub fn beam_search<D: Data<Elem = f32>, E: Data<Elem = usize>>(
             // we've run out of beam (probably the threshold is too high)
             return Err(SearchError::RanOutOfBeam);
         }
-        let top = beam[0].probability();
-        for mut x in &mut beam {
-            x.prob_1.label /= top;
-            x.prob_1.gap /= top;
+        let scale_1 = beam[0].prob_1.probability();
+        let scale_2 = beam[0].prob_2_max;
+        for x in &mut beam {
+            x.prob_1.label /= scale_1;
+            x.prob_1.gap /= scale_1;
+            let secondary = suffix_tree
+                .get_data_ref_mut(x.node)
+                .unwrap_or(&mut root_secondary_probs);
+            for val in &mut secondary.probs {
+                val.label /= scale_2;
+                val.gap /= scale_2;
+            }
+            secondary.max_prob /= scale_2;
+            x.prob_2_max = secondary.max_prob;
         }
     }
 

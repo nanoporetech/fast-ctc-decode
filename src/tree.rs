@@ -150,6 +150,14 @@ impl<T> SuffixTree<T> {
         }
     }
 
+    pub fn get_data_ref_mut(&mut self, node: i32) -> Option<&mut T> {
+        if node >= 0 && (node as usize) < self.nodes.len() {
+            Some(&mut self.nodes[node as usize].data)
+        } else {
+            None
+        }
+    }
+
     pub fn iter_from_no_data(&self, node: i32) -> SuffixTreeIterNoData<T> {
         assert!((node as usize) < self.nodes.len());
         SuffixTreeIterNoData {
