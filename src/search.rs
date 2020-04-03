@@ -1,3 +1,4 @@
+use super::SearchError;
 use crate::vec2d::Vec2D;
 use ndarray::{ArrayBase, Data, Ix2};
 
@@ -43,8 +44,7 @@ pub fn beam_search<D: Data<Elem = f32>>(
     alphabet: &Vec<String>,
     beam_size: usize,
     beam_cut_threshold: f32,
-) -> Option<(String, Vec<usize>)> {
-
+) -> Result<(String, Vec<usize>), SearchError> {
     // alphabet_size minus the blank label
     let alphabet_size = alphabet.len() - 1;
     let duration = network_output.nrows();
@@ -167,11 +167,22 @@ pub fn beam_search<D: Data<Elem = f32>>(
         }
 
         beam.retain(|x| x.node != -1);
-        beam.sort_by(|a, b| (b.probability()).partial_cmp(&(a.probability())).unwrap());
+        let mut has_nans = false;
+        beam.sort_unstable_by(|a, b| {
+            (b.probability())
+                .partial_cmp(&(a.probability()))
+                .unwrap_or_else(|| {
+                    has_nans = true;
+                    std::cmp::Ordering::Equal // don't really care
+                })
+        });
+        if has_nans {
+            return Err(SearchError::IncomparableValues);
+        }
         beam.truncate(beam_size);
         if beam.is_empty() {
             // we've run out of beam (probably the threshold is too high)
-            return None;
+            return Err(SearchError::RanOutOfBeam);
         }
         let top = beam[0].probability();
         for mut x in &mut beam {
@@ -191,5 +202,5 @@ pub fn beam_search<D: Data<Elem = f32>>(
         node_idx = node.next;
     }
 
-    Some((sequence, path))
+    Ok((sequence, path))
 }

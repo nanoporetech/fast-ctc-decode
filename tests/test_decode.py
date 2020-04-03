@@ -98,6 +98,12 @@ class Tests(TestCase):
         with self.assertRaises(ValueError):
             beam_search(self.probs, alphabet, self.beam_size, self.beam_cut_threshold)
 
+    def test_nans(self):
+        """beam_search is passed NaN values"""
+        self.probs.fill(np.NaN)
+        with self.assertRaisesRegexp(RuntimeError, "Failed to compare values"):
+            beam_search(self.probs, self.alphabet)
+
     def test_beam_search_short_alphabet(self):
         """ simple beam search test with short alphabet"""
         self.alphabet = "NAG"

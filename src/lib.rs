@@ -5,13 +5,35 @@ extern crate ndarray;
 
 use numpy::PyArray2;
 
-use pyo3::exceptions::ValueError;
+use pyo3::exceptions::{RuntimeError, ValueError};
 use pyo3::prelude::*;
 use pyo3::types::PySequence;
 use pyo3::wrap_pyfunction;
+use std::fmt;
 
 mod search;
 mod vec2d;
+
+#[derive(Clone, Copy, Debug)]
+pub enum SearchError {
+    RanOutOfBeam,
+    IncomparableValues,
+}
+
+impl fmt::Display for SearchError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SearchError::RanOutOfBeam => {
+                write!(f, "Ran out of search space (beam_cut_threshold too high)")
+            }
+            SearchError::IncomparableValues => {
+                write!(f, "Failed to compare values (NaNs in input?)")
+            }
+        }
+    }
+}
+
+impl std::error::Error for SearchError {}
 
 /// Perform a CTC beam search decode on an RNN output.
 ///
@@ -96,11 +118,7 @@ fn beam_search(
             beam_size,
             beam_cut_threshold,
         )
-        .map_or_else(
-            // this should have been caught above, but floating point comparisons can be weird
-            || Err(ValueError::py_err("beam_cut_threshold too high")),
-            Ok,
-        )
+        .map_err(|e| RuntimeError::py_err(format!("{}", e)))
     }
 }
 
