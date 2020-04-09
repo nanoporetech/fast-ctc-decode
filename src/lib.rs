@@ -70,7 +70,7 @@ impl std::error::Error for SearchError {}
 ///         output of a softmax layer, with values between 0.0 and 1.0 representing probabilities.
 ///         The first (outer) axis is time, and the second (inner) axis is label. The first entry
 ///         on the label axis is the blank label.
-///     alphabet (sequence): The labels (including the blank label) in the order given on the label
+///     alphabet (sequence): The labels (including the blank label at pos 0) in the order given on the label
 ///          axis of `network_output`. Length must match the size of the inner axis of `network_output`.
 ///     beam_size (int): How many suffix_tree should be kept at each step. Higher numbers are less
 ///         likely to discard the true labelling, but also make it slower and more memory
