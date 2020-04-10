@@ -91,7 +91,7 @@ fn beam_search(
     alphabet: &PySequence,
     beam_size: usize,
     beam_cut_threshold: f32,
-) -> PyResult<(String, Vec<usize>)> {
+) -> PyResult<(String, Vec<usize>, String)> {
     let alphabet: Vec<String> = alphabet.tuple()?.iter().map(|x| x.to_string()).collect();
     let max_beam_cut = 1.0 / (alphabet.len() as f32);
     if alphabet.len() != network_output.shape()[1] {

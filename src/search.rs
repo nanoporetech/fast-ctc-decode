@@ -9,12 +9,23 @@ struct LabelNode {
     ///
     /// Note that blanks are not represented by a LabelNode - this is an actual label.
     label: usize,
+    /// The probability of this label.
+    ////
+    label_prob: f32,
     /// The index of the next LabelNode.
     ///
     /// Can also be considered the parent edge in the tree of labelling suffixes.
     next: i32,
     /// The last(?) sample to which the label applies.
     time: usize,
+}
+
+impl LabelNode {
+    /// Calculate Phred quality score for the label
+    fn phred(&self) -> char {
+        let q = (-10.0 * (1.0 - self.label_prob).log10()) as u32;
+        std::char::from_u32(q + 33).unwrap()
+    }
 }
 
 /// A node in the labelling tree to build from.
@@ -44,7 +55,7 @@ pub fn beam_search<D: Data<Elem = f32>>(
     alphabet: &Vec<String>,
     beam_size: usize,
     beam_cut_threshold: f32,
-) -> Result<(String, Vec<usize>), SearchError> {
+) -> Result<(String, Vec<usize>, String), SearchError> {
     // alphabet_size minus the blank label
     let alphabet_size = alphabet.len() - 1;
     let duration = network_output.nrows();
@@ -55,6 +66,7 @@ pub fn beam_search<D: Data<Elem = f32>>(
     // next field of LabelNode giving the index of each node's parent.
     let mut suffix_tree = vec![LabelNode {
         label: 0,
+        label_prob: 0.0,
         next: 0,
         time: 0,
     }];
@@ -116,6 +128,7 @@ pub fn beam_search<D: Data<Elem = f32>>(
                         new_node_idx = suffix_tree.len() as i32;
                         suffix_tree.push(LabelNode {
                             label: label,
+                            label_prob: pr_b,
                             next: node,
                             time: fidx,
                         });
@@ -134,6 +147,7 @@ pub fn beam_search<D: Data<Elem = f32>>(
                         new_node_idx = suffix_tree.len() as i32;
                         suffix_tree.push(LabelNode {
                             label: label,
+                            label_prob: pr_b,
                             next: node,
                             time: fidx,
                         });
@@ -194,13 +208,15 @@ pub fn beam_search<D: Data<Elem = f32>>(
     let mut node_idx = beam[0].node;
     let mut path = Vec::new();
     let mut sequence = String::new();
+    let mut qstring = String::new();
 
     while node_idx != 0 {
         let node = &suffix_tree[node_idx as usize];
         path.push(node.time);
         sequence.push_str(&alphabet[node.label]);
+        qstring.push(node.phred());
         node_idx = node.next;
     }
 
-    Ok((sequence, path))
+    Ok((sequence, path, qstring))
 }
