@@ -19,25 +19,25 @@ class Tests(TestCase):
 
     def test_beam_search(self):
         """ simple beam search test with the canonical alphabet"""
-        seq, path, qstr = beam_search(self.probs, self.alphabet, self.beam_size, self.beam_cut_threshold)
+        seq, path = beam_search(self.probs, self.alphabet, self.beam_size, self.beam_cut_threshold)
         self.assertEqual(len(seq), len(path))
         self.assertEqual(len(set(seq)), len(self.alphabet) - 1)
 
     def test_beam_search_list(self):
         """ simple beam search test with the canonical alphabet as a list"""
-        seq, path, qstr = beam_search(self.probs, list(self.alphabet), self.beam_size, self.beam_cut_threshold)
+        seq, path = beam_search(self.probs, list(self.alphabet), self.beam_size, self.beam_cut_threshold)
         self.assertEqual(len(seq), len(path))
         self.assertEqual(len(set(seq)), len(self.alphabet) - 1)
 
     def test_beam_search_tuple(self):
         """ simple beam search test with the canonical alphabet as a tuple"""
-        seq, path, qstr = beam_search(self.probs, tuple(self.alphabet), self.beam_size, self.beam_cut_threshold)
+        seq, path = beam_search(self.probs, tuple(self.alphabet), self.beam_size, self.beam_cut_threshold)
         self.assertEqual(len(seq), len(path))
         self.assertEqual(len(set(seq)), len(self.alphabet) - 1)
 
     def test_beam_search_named_args(self):
         """ simple beam search test with named arguments"""
-        seq, path, qstr = beam_search(network_output=self.probs, alphabet=self.alphabet,
+        seq, path = beam_search(network_output=self.probs, alphabet=self.alphabet,
                                 beam_size=self.beam_size,
                                 beam_cut_threshold=self.beam_cut_threshold)
         self.assertEqual(len(seq), len(path))
@@ -50,13 +50,13 @@ class Tests(TestCase):
 
     def test_beam_search_defaults(self):
         """ simple beam search test using argument defaults"""
-        seq, path, qstr = beam_search(self.probs, self.alphabet)
+        seq, path = beam_search(self.probs, self.alphabet)
         self.assertEqual(len(seq), len(path))
         self.assertEqual(len(set(seq)), len(self.alphabet) - 1)
 
     def test_beam_search_alphabet(self):
         """ simple beam search test with different alphabet"""
-        seq, path, qstr = beam_search(self.probs, "NRUST", self.beam_size, self.beam_cut_threshold)
+        seq, path = beam_search(self.probs, "NRUST", self.beam_size, self.beam_cut_threshold)
         self.assertEqual(len(seq), len(path))
         self.assertEqual(len(set(seq)), len(self.alphabet) - 1)
 
@@ -67,7 +67,7 @@ class Tests(TestCase):
 
     def test_zero_beam_cut_threshold(self):
         """ simple beam search test with beam cut threshold of 0.0"""
-        seq, path, qstr = beam_search(self.probs, self.alphabet, self.beam_size, 0.0)
+        seq, path = beam_search(self.probs, self.alphabet, self.beam_size, 0.0)
         self.assertEqual(len(seq), len(path))
         self.assertEqual(len(set(seq)), len(self.alphabet) - 1)
 
@@ -108,7 +108,7 @@ class Tests(TestCase):
         """ simple beam search test with short alphabet"""
         self.alphabet = "NAG"
         self.probs = self.get_random_data()
-        seq, path, qstr = beam_search(self.probs, self.alphabet, self.beam_size, self.beam_cut_threshold)
+        seq, path = beam_search(self.probs, self.alphabet, self.beam_size, self.beam_cut_threshold)
         self.assertEqual(len(seq), len(path))
         self.assertEqual(len(set(seq)), len(self.alphabet) - 1)
 
@@ -116,7 +116,7 @@ class Tests(TestCase):
         """ simple beam search test with long alphabet"""
         self.alphabet = "NABCDEFGHIJK"
         self.probs = self.get_random_data(10000)
-        seq, path, qstr = beam_search(self.probs, self.alphabet, self.beam_size, beam_cut_threshold=0.0)
+        seq, path = beam_search(self.probs, self.alphabet, self.beam_size, beam_cut_threshold=0.0)
         self.assertEqual(len(seq), len(path))
         self.assertEqual(len(set(seq)), len(self.alphabet) - 1)
 
@@ -131,7 +131,7 @@ class Tests(TestCase):
         for base, pos in enumerate(emit):
             x[pos, base % 4 + 1] = 1.0
 
-        seq, path, qstr = beam_search(x, self.alphabet, self.beam_size, self.beam_cut_threshold)
+        seq, path = beam_search(x, self.alphabet, self.beam_size, self.beam_cut_threshold)
         np.testing.assert_array_equal(emit, path)
         self.assertEqual(len(seq), len(path))
 
@@ -146,7 +146,7 @@ class Tests(TestCase):
             x[idx, 0] = 0.0
             x[idx, 1] = 1.0
 
-        seq, path, qstr = beam_search(x, self.alphabet, self.beam_size, self.beam_cut_threshold)
+        seq, path = beam_search(x, self.alphabet, self.beam_size, self.beam_cut_threshold)
 
         self.assertEqual(seq, 'AAA')
         self.assertEqual(len(seq), len(path))
@@ -166,7 +166,7 @@ class Tests(TestCase):
             x[idx, alphabet_idx] = 1.0
             alphabet_idx += 1
 
-        seq, path, qstr = beam_search(x, self.alphabet, self.beam_size, self.beam_cut_threshold)
+        seq, path = beam_search(x, self.alphabet, self.beam_size, self.beam_cut_threshold)
 
         self.assertEqual(seq, 'AAACCCGGG')
         self.assertEqual(path, expected_path)
@@ -182,7 +182,7 @@ class Tests(TestCase):
             x[idx-1:idx + 1, 0] = 0.0
             x[idx-1:idx + 1, 1] = 1.0
 
-        seq, path, qstr = beam_search(x, self.alphabet, self.beam_size, self.beam_cut_threshold)
+        seq, path = beam_search(x, self.alphabet, self.beam_size, self.beam_cut_threshold)
 
         self.assertEqual(seq, 'AAA')
         self.assertEqual(len(seq), len(path))

@@ -71,12 +71,13 @@ impl std::error::Error for SearchError {}
 ///         The first (outer) axis is time, and the second (inner) axis is label. The first entry
 ///         on the label axis is the blank label.
 ///     alphabet (sequence): The labels (including the blank label at pos 0) in the order given on the label
-///          axis of `network_output`. Length must match the size of the inner axis of `network_output`.
+///         axis of `network_output`. Length must match the size of the inner axis of `network_output`.
 ///     beam_size (int): How many suffix_tree should be kept at each step. Higher numbers are less
 ///         likely to discard the true labelling, but also make it slower and more memory
 ///         intensive. Must be at least 1.
 ///     beam_cut_threshold (float): Ignore any entries in `network_output` below this value. Must
 ///         be at least 0.0, and less than ``1/len(alphabet)``.
+///     qstring (bool): If `True` a Phred quality score will be appended to the return sequence.
 ///
 /// Returns:
 ///     tuple of (str, numpy.ndarray): The decoded sequence and an array of the final
@@ -84,14 +85,15 @@ impl std::error::Error for SearchError {}
 ///
 /// Raises:
 ///     ValueError: The constraints on the arguments have not been met.
-#[pyfunction(beam_size = "5", beam_cut_threshold = "0.0")]
-#[text_signature = "(network_output, alphabet, beam_size=5, beam_cut_threshold=0.0)"]
+#[pyfunction(beam_size = "5", beam_cut_threshold = "0.0", qstring = false)]
+#[text_signature = "(network_output, alphabet, beam_size=5, beam_cut_threshold=0.0, qstring=False)"]
 fn beam_search(
     network_output: &PyArray2<f32>,
     alphabet: &PySequence,
     beam_size: usize,
     beam_cut_threshold: f32,
-) -> PyResult<(String, Vec<usize>, String)> {
+    qstring: bool,
+) -> PyResult<(String, Vec<usize>)> {
     let alphabet: Vec<String> = alphabet.tuple()?.iter().map(|x| x.to_string()).collect();
     let max_beam_cut = 1.0 / (alphabet.len() as f32);
     if alphabet.len() != network_output.shape()[1] {
@@ -117,6 +119,7 @@ fn beam_search(
             &alphabet,
             beam_size,
             beam_cut_threshold,
+            qstring,
         )
         .map_err(|e| RuntimeError::py_err(format!("{}", e)))
     }

@@ -1,6 +1,8 @@
 use super::SearchError;
 use crate::vec2d::Vec2D;
 use ndarray::{ArrayBase, Data, Ix2};
+use std::cmp::max;
+use std::cmp::min;
 
 /// An element in a possible labelling.
 #[derive(Clone, Copy, Debug)]
@@ -24,7 +26,7 @@ impl LabelNode {
     /// Calculate Phred quality score for the label
     fn phred(&self) -> char {
         let q = (-10.0 * (1.0 - self.label_prob).log10()) as u32;
-        std::char::from_u32(q + 33).unwrap()
+        std::char::from_u32(max(min(q, 94), 1) + 32).unwrap()
     }
 }
 
@@ -55,7 +57,8 @@ pub fn beam_search<D: Data<Elem = f32>>(
     alphabet: &Vec<String>,
     beam_size: usize,
     beam_cut_threshold: f32,
-) -> Result<(String, Vec<usize>, String), SearchError> {
+    qstring: bool,
+) -> Result<(String, Vec<usize>), SearchError> {
     // alphabet_size minus the blank label
     let alphabet_size = alphabet.len() - 1;
     let duration = network_output.nrows();
@@ -208,15 +211,19 @@ pub fn beam_search<D: Data<Elem = f32>>(
     let mut node_idx = beam[0].node;
     let mut path = Vec::new();
     let mut sequence = String::new();
-    let mut qstring = String::new();
+    let mut phred = String::new();
 
     while node_idx != 0 {
         let node = &suffix_tree[node_idx as usize];
         path.push(node.time);
         sequence.push_str(&alphabet[node.label]);
-        qstring.push(node.phred());
+        phred.push(node.phred());
         node_idx = node.next;
     }
 
-    Ok((sequence, path, qstring))
+    if qstring {
+        sequence.push_str(&phred);
+    }
+
+    Ok((sequence, path))
 }
