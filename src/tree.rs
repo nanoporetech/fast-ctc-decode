@@ -87,6 +87,12 @@ impl<'a, T> Iterator for SuffixTreeIterNoData<'a, T> {
 
 pub const ROOT_NODE: i32 = -1;
 
+#[derive(Clone, Copy, Debug)]
+pub struct NodeInfo {
+    pub parent: i32,
+    pub label: usize,
+}
+
 impl<T> SuffixTree<T> {
     pub fn new(alphabet_size: usize) -> Self {
         Self {
@@ -99,6 +105,18 @@ impl<T> SuffixTree<T> {
     pub fn label(&self, node: i32) -> Option<usize> {
         if node >= 0 {
             Some(self.nodes[node as usize].label)
+        } else {
+            None
+        }
+    }
+
+    pub fn info(&self, node: i32) -> Option<NodeInfo> {
+        if node >= 0 {
+            let node = &self.nodes[node as usize];
+            Some(NodeInfo {
+                parent: node.parent,
+                label: node.label,
+            })
         } else {
             None
         }

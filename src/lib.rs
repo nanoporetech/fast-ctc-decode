@@ -25,6 +25,7 @@ mod vec2d;
 pub enum SearchError {
     RanOutOfBeam,
     IncomparableValues,
+    InvalidEnvelope,
 }
 
 impl fmt::Display for SearchError {
@@ -36,6 +37,8 @@ impl fmt::Display for SearchError {
             SearchError::IncomparableValues => {
                 write!(f, "Failed to compare values (NaNs in input?)")
             }
+            // TODO: document envelope constraints
+            SearchError::InvalidEnvelope => write!(f, "Invalid envelope values"),
         }
     }
 }
