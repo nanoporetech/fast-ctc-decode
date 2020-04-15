@@ -147,18 +147,62 @@ impl SearchPoint {
 
 #[derive(Debug)]
 struct SecondaryProbs {
-    offset: usize,
+    offset: isize,
     probs: Vec<ProbPair>,
     max_prob: LogSpace,
 }
 
 impl SecondaryProbs {
-    fn with_offset(offset: usize) -> Self {
+    fn with_offset(offset: isize) -> Self {
         SecondaryProbs {
             offset,
             probs: Vec::new(),
             max_prob: LogSpace::zero(),
         }
+    }
+
+    fn get(&self, at: isize) -> ProbPair {
+        let index = at - self.offset;
+        if index < 0 {
+            ProbPair::zero()
+        } else {
+            let index = index as usize;
+            if index < self.probs.len() {
+                self.probs[index as usize]
+            } else {
+                ProbPair::zero()
+            }
+        }
+    }
+
+    fn discard_until(&mut self, keep_from: isize) {
+        if keep_from > self.offset {
+            let first_index = (keep_from - self.offset) as usize;
+            if first_index < self.probs.len() {
+                self.probs.drain(0..first_index);
+            } else {
+                self.probs.clear();
+            }
+            self.offset = keep_from;
+        }
+    }
+
+    fn update_max(&mut self, lower_bound: isize, upper_bound: isize) {
+        assert!(lower_bound <= upper_bound);
+
+        let len = self.probs.len() as isize;
+        let begin = (lower_bound - self.offset).clamp(0, len) as usize;
+        let end = (upper_bound - self.offset).clamp(begin as isize, len) as usize;
+        let mut max_prob = LogSpace::zero();
+        for prob in &self.probs[begin..end] {
+            max_prob = max_prob.max(prob.probability());
+        }
+        self.max_prob = max_prob;
+    }
+
+    fn end(&self) -> isize {
+        assert!(self.probs.len() <= (std::isize::MAX as usize));
+        self.offset + (self.probs.len() as isize)
     }
 }
 
@@ -170,26 +214,21 @@ fn build_secondary_probs<D: Data<Elem = LogSpace>>(
     lower_bound: usize,
     upper_bound: usize,
 ) -> SecondaryProbs {
-    let mut probs = SecondaryProbs::with_offset(lower_bound);
+    assert!(lower_bound < upper_bound);
+    assert!(upper_bound <= (std::isize::MAX as usize));
+    assert!(upper_bound <= network_output.shape()[0]);
+    assert!(label + 1 < network_output.shape()[1]);
+
+    let mut probs = SecondaryProbs::with_offset(lower_bound as isize);
     probs.probs.reserve(upper_bound - lower_bound);
     let mut last_probs = ProbPair::zero();
-    for (idx, labelling_probs) in ((lower_bound..upper_bound).rev()).zip(
+    for (idx, labelling_probs) in (lower_bound..upper_bound).zip(
         network_output
-            .slice(s![lower_bound..upper_bound;-1, ..])
+            .slice(s![lower_bound..upper_bound, ..])
             .outer_iter(),
     ) {
         let gap_prob = last_probs.probability() * labelling_probs[0];
-        let prev_idx = idx + 1; // we're going backwards
-        let prev_parent_probs = if prev_idx < parent_probs.offset {
-            ProbPair::zero()
-        } else {
-            let parent_idx = prev_idx - parent_probs.offset;
-            if parent_idx >= parent_probs.probs.len() {
-                ProbPair::zero()
-            } else {
-                parent_probs.probs[parent_idx]
-            }
-        };
+        let prev_parent_probs = parent_probs.get((idx as isize) - 1);
         let label_prob = if is_repeat {
             labelling_probs[label + 1] * (last_probs.label + prev_parent_probs.gap)
         } else {
@@ -202,7 +241,6 @@ fn build_secondary_probs<D: Data<Elem = LogSpace>>(
         probs.probs.push(last_probs);
         probs.max_prob = probs.max_prob.max(last_probs.probability());
     }
-    probs.probs.reverse(); // we added them in the wrong order
     probs
 }
 
@@ -215,35 +253,34 @@ fn extend_secondary_probs<D: Data<Elem = LogSpace>>(
     lower_bound: usize,
     upper_bound: usize,
 ) {
-    assert!(lower_bound <= probs.offset);
-    let mut last_probs = probs.probs.first().copied().unwrap_or(ProbPair::zero());
+    assert!(upper_bound <= (std::isize::MAX as usize));
+    assert!(lower_bound <= upper_bound);
 
-    // we only want the maximum probability in the range [lower_bound..upper_bound)
-    probs.max_prob = LogSpace::zero();
-    let intersection_end = probs.probs.len().min(upper_bound - probs.offset);
-    for prob in &probs.probs[..intersection_end] {
-        probs.max_prob = probs.max_prob.max(prob.probability());
+    // discard everything below lower_bound-1, and make sure max_prob only covers from lower_bound
+    if (lower_bound as isize) > probs.offset {
+        // one before the lower_bound is useful for calculating child probabilities, don't need
+        // anything before that
+        probs.discard_until((lower_bound as isize) - 1);
+        if probs.probs.is_empty() {
+            probs.offset = lower_bound as isize;
+        }
+        probs.update_max(lower_bound as isize, upper_bound as isize);
     }
 
-    probs.probs.reverse();
-    probs.probs.reserve(probs.offset - lower_bound);
-    for (idx, labelling_probs) in ((lower_bound..probs.offset).rev()).zip(
+    let current_end = probs.end();
+    assert!(current_end >= 0);
+    let current_end = current_end as usize;
+    assert!(current_end < upper_bound);
+
+    let mut last_probs = probs.probs.last().copied().unwrap_or(ProbPair::zero());
+    probs.probs.reserve(upper_bound - current_end);
+    for (idx, labelling_probs) in (current_end..upper_bound).zip(
         network_output
-            .slice(s![lower_bound..probs.offset;-1, ..])
+            .slice(s![current_end..upper_bound, ..])
             .outer_iter(),
     ) {
         let gap_prob = last_probs.probability() * labelling_probs[0];
-        let prev_idx = idx + 1; // we're going backwards
-        let prev_parent_probs = if prev_idx < parent_probs.offset {
-            ProbPair::zero()
-        } else {
-            let parent_idx = prev_idx - parent_probs.offset;
-            if parent_idx >= parent_probs.probs.len() {
-                ProbPair::zero()
-            } else {
-                parent_probs.probs[parent_idx]
-            }
-        };
+        let prev_parent_probs = parent_probs.get((idx as isize) - 1);
         let label_prob = if is_repeat {
             labelling_probs[label + 1] * (last_probs.label + prev_parent_probs.gap)
         } else {
@@ -256,28 +293,24 @@ fn extend_secondary_probs<D: Data<Elem = LogSpace>>(
         probs.probs.push(last_probs);
         probs.max_prob = probs.max_prob.max(last_probs.probability());
     }
-    probs.offset = lower_bound;
-    probs.probs.reverse(); // we added them in the wrong order
 }
 
 fn root_probs<D: Data<Elem = LogSpace>>(
     gap_probs: &ArrayBase<D, Ix1>,
-    lower_bound: usize,
+    upper_bound: usize,
 ) -> SecondaryProbs {
     let mut probs = SecondaryProbs {
-        offset: lower_bound,
+        offset: -1,
         probs: Vec::new(),
         max_prob: LogSpace::one(),
     };
-    probs.probs.reserve(1 + gap_probs.len() - lower_bound);
-    // this is the only "out of bounds" probability that isn't just zero
-    probs.probs.push(ProbPair::with_gap(LogSpace::one()));
+    probs.probs.reserve(upper_bound + 1);
     let mut cur_prob = LogSpace::one();
-    for &prob in gap_probs.slice(s![lower_bound..;-1]) {
+    probs.probs.push(ProbPair::with_gap(cur_prob));
+    for &prob in gap_probs.slice(s![..upper_bound]) {
         cur_prob *= prob;
         probs.probs.push(ProbPair::with_gap(cur_prob));
     }
-    probs.probs.reverse();
     probs
 }
 
@@ -311,26 +344,20 @@ pub fn beam_search<D: Data<Elem = f32>, E: Data<Elem = usize>>(
         prob_2_max: LogSpace::one(),
     }];
     let mut next_beam = Vec::new();
-    let root_secondary_probs = root_probs(
-        &network_output_2.index_axis(Axis(1), 0),
-        envelope[[envelope.nrows() - 1, 0]],
-    );
+    let root_secondary_probs =
+        root_probs(&network_output_2.index_axis(Axis(1), 0), envelope[(0, 1)]);
     let network_2_len = network_output_2.shape()[0];
-    let mut last_lower_bound = 0;
+    let mut last_upper_bound = 0;
 
-    for (labelling_probs, bounds) in network_output_1
-        .slice(s![..;-1, ..])
-        .outer_iter()
-        .zip(envelope.outer_iter().rev())
-    {
+    for (labelling_probs, bounds) in network_output_1.outer_iter().zip(envelope.outer_iter()) {
         next_beam.clear();
 
         let (lower_t, upper_t) = (bounds[0].max(0), bounds[1].min(network_2_len));
-        if lower_t >= upper_t || upper_t < last_lower_bound {
+        if lower_t >= upper_t || lower_t > last_upper_bound {
             return Err(SearchError::InvalidEnvelope);
         }
 
-        if lower_t < last_lower_bound {
+        if upper_t > last_upper_bound {
             // need to extend secondary probs for anything still in the search beam
 
             beam.sort_by_key(|x| x.node); // parents before children
@@ -364,7 +391,7 @@ pub fn beam_search<D: Data<Elem = f32>, E: Data<Elem = usize>>(
             }
         }
 
-        last_lower_bound = lower_t;
+        last_upper_bound = upper_t;
 
         for &tip in &beam {
             let tip_label = suffix_tree.label(tip.node);
@@ -480,9 +507,171 @@ pub fn beam_search<D: Data<Elem = f32>, E: Data<Elem = usize>>(
 
     let mut sequence = String::new();
 
-    for label in suffix_tree.iter_from_no_data(beam[0].node) {
-        sequence.push_str(&alphabet[label + 1]);
+    if beam[0].node != ROOT_NODE {
+        for label in suffix_tree.iter_from_no_data(beam[0].node) {
+            sequence.push_str(&alphabet[label + 1]);
+        }
     }
 
-    Ok(sequence)
+    Ok(sequence.chars().rev().collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cmp::PartialEq;
+
+    #[test]
+    fn test_secondary_probs_get() {
+        let mut p = SecondaryProbs {
+            offset: 0,
+            probs: vec![
+                ProbPair::with_gap(LogSpace::new(0.1)),
+                ProbPair::with_gap(LogSpace::new(0.2)),
+                ProbPair::with_gap(LogSpace::new(0.3)),
+            ],
+            max_prob: LogSpace::zero(),
+        };
+        assert!(!p.probs[0].gap.eq(&p.probs[1].gap));
+        assert!(!p.probs[0].gap.eq(&p.probs[2].gap));
+        assert!(!p.probs[1].gap.eq(&p.probs[2].gap));
+
+        assert!(p.get(-1).gap.eq(&LogSpace::zero()));
+        assert!(p.get(0).gap.eq(&p.probs[0].gap));
+        assert!(p.get(1).gap.eq(&p.probs[1].gap));
+        assert!(p.get(2).gap.eq(&p.probs[2].gap));
+        assert!(p.get(3).gap.eq(&LogSpace::zero()));
+
+        p.offset = 3;
+        assert!(p.get(-1).gap.eq(&LogSpace::zero()));
+        assert!(p.get(0).gap.eq(&LogSpace::zero()));
+        assert!(p.get(2).gap.eq(&LogSpace::zero()));
+        assert!(p.get(3).gap.eq(&p.probs[0].gap));
+        assert!(p.get(4).gap.eq(&p.probs[1].gap));
+        assert!(p.get(5).gap.eq(&p.probs[2].gap));
+        assert!(p.get(6).gap.eq(&LogSpace::zero()));
+
+        p.offset = -1;
+        assert!(p.get(-2).gap.eq(&LogSpace::zero()));
+        assert!(p.get(-1).gap.eq(&p.probs[0].gap));
+        assert!(p.get(0).gap.eq(&p.probs[1].gap));
+        assert!(p.get(1).gap.eq(&p.probs[2].gap));
+        assert!(p.get(2).gap.eq(&LogSpace::zero()));
+
+        p.probs.clear();
+        p.offset = 0;
+        assert!(p.get(-1).gap.eq(&LogSpace::zero()));
+        assert!(p.get(0).gap.eq(&LogSpace::zero()));
+        assert!(p.get(1).gap.eq(&LogSpace::zero()));
+
+        p.offset = -1;
+        assert!(p.get(-2).gap.eq(&LogSpace::zero()));
+        assert!(p.get(-1).gap.eq(&LogSpace::zero()));
+        assert!(p.get(0).gap.eq(&LogSpace::zero()));
+
+        p.offset = 4;
+        assert!(p.get(3).gap.eq(&LogSpace::zero()));
+        assert!(p.get(4).gap.eq(&LogSpace::zero()));
+        assert!(p.get(5).gap.eq(&LogSpace::zero()));
+    }
+
+    #[test]
+    fn test_secondary_probs_update_max_empty() {
+        let mut p = SecondaryProbs {
+            offset: 0,
+            probs: vec![],
+            max_prob: LogSpace::zero(),
+        };
+
+        p.max_prob = LogSpace::one();
+        p.update_max(0, 0);
+        assert!(p.max_prob.eq(&LogSpace::zero()));
+
+        p.max_prob = LogSpace::one();
+        p.update_max(-1, 0);
+        assert!(p.max_prob.eq(&LogSpace::zero()));
+
+        p.max_prob = LogSpace::one();
+        p.update_max(0, 1);
+        assert!(p.max_prob.eq(&LogSpace::zero()));
+
+        p.max_prob = LogSpace::one();
+        p.update_max(-1, 1);
+        assert!(p.max_prob.eq(&LogSpace::zero()));
+
+        p.max_prob = LogSpace::one();
+        p.update_max(std::isize::MIN, std::isize::MAX);
+        assert!(p.max_prob.eq(&LogSpace::zero()));
+    }
+
+    #[test]
+    fn test_secondary_probs_update_max_values() {
+        let mut p = SecondaryProbs {
+            offset: 2,
+            probs: vec![
+                ProbPair::with_gap(LogSpace::new(0.1)),
+                ProbPair::with_label(LogSpace::new(0.3)),
+                ProbPair::with_label(LogSpace::new(0.2)),
+                ProbPair::with_label(LogSpace::new(0.4)),
+                ProbPair::with_gap(LogSpace::new(0.5)),
+            ],
+            max_prob: LogSpace::zero(),
+        };
+
+        p.max_prob = LogSpace::one();
+        p.update_max(0, 0);
+        assert!(p.max_prob.eq(&LogSpace::zero()));
+
+        p.max_prob = LogSpace::one();
+        p.update_max(0, 2);
+        assert!(p.max_prob.eq(&LogSpace::zero()));
+
+        p.max_prob = LogSpace::one();
+        p.update_max(0, 3);
+        assert!(p.max_prob.eq(&LogSpace::new(0.1)));
+
+        p.max_prob = LogSpace::one();
+        p.update_max(2, 2);
+        assert!(p.max_prob.eq(&LogSpace::zero()));
+
+        p.max_prob = LogSpace::one();
+        p.update_max(2, 3);
+        assert!(p.max_prob.eq(&LogSpace::new(0.1)));
+
+        p.max_prob = LogSpace::one();
+        p.update_max(2, 4);
+        assert!(p.max_prob.eq(&LogSpace::new(0.3)));
+
+        p.max_prob = LogSpace::one();
+        p.update_max(2, 5);
+        assert!(p.max_prob.eq(&LogSpace::new(0.3)));
+
+        p.max_prob = LogSpace::one();
+        p.update_max(2, 6);
+        assert!(p.max_prob.eq(&LogSpace::new(0.4)));
+
+        p.max_prob = LogSpace::one();
+        p.update_max(2, 7);
+        assert!(p.max_prob.eq(&LogSpace::new(0.5)));
+
+        p.max_prob = LogSpace::one();
+        p.update_max(6, 7);
+        assert!(p.max_prob.eq(&LogSpace::new(0.5)));
+
+        p.max_prob = LogSpace::one();
+        p.update_max(7, 7);
+        assert!(p.max_prob.eq(&LogSpace::zero()));
+
+        p.max_prob = LogSpace::one();
+        p.update_max(2, 10);
+        assert!(p.max_prob.eq(&LogSpace::new(0.5)));
+
+        p.max_prob = LogSpace::one();
+        p.update_max(3, 10);
+        assert!(p.max_prob.eq(&LogSpace::new(0.5)));
+
+        p.max_prob = LogSpace::one();
+        p.update_max(8, 10);
+        assert!(p.max_prob.eq(&LogSpace::zero()));
+    }
 }

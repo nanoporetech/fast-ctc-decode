@@ -148,9 +148,11 @@ pub fn beam_search<D: Data<Elem = f32>>(
     let mut path = Vec::new();
     let mut sequence = String::new();
 
-    for (label, time) in suffix_tree.iter_from(beam[0].node) {
-        path.push(time);
-        sequence.push_str(&alphabet[label + 1]);
+    if beam[0].node != ROOT_NODE {
+        for (label, time) in suffix_tree.iter_from(beam[0].node) {
+            path.push(time);
+            sequence.push_str(&alphabet[label + 1]);
+        }
     }
 
     Ok((sequence, path))

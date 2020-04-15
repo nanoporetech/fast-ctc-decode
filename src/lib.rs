@@ -1,4 +1,5 @@
 #![feature(static_nobundle)]
+#![feature(clamp)]
 #![feature(test)] // benchmarking
 
 #[macro_use(s)]
