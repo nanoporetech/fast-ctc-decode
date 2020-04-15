@@ -24,4 +24,5 @@ jobs:
           source venv3/bin/activate
           python3 -m pip install maturin numpy
           maturin develop
+          cargo test
           python3 tests/test_decode.py
