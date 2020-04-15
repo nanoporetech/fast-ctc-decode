@@ -8,4 +8,5 @@ develop:
 	maturin develop
 
 test: develop
+	cargo test
 	python3 tests/test_decode.py

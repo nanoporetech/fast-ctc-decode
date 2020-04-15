@@ -2,11 +2,10 @@
 
 import numpy as np
 from unittest import TestCase, main
-from fast_ctc_decode import beam_search
+from fast_ctc_decode import *
 
 
-class Tests(TestCase):
-
+class Test1DBeamSearch(TestCase):
     def setUp(self):
         self.beam_size = 5
         self.alphabet = "NACGT"
@@ -187,6 +186,160 @@ class Tests(TestCase):
         self.assertEqual(seq, 'AAA')
         self.assertEqual(len(seq), len(path))
         self.assertEqual(path, expected_path)
+
+class TestViterbiSearch(TestCase):
+    def setUp(self):
+        self.alphabet = "NACGT"
+        self.probs = self.get_random_data()
+
+    def get_random_data(self, samples=100):
+        x = np.random.rand(samples, len(self.alphabet)).astype(np.float32)
+        return x / np.linalg.norm(x, ord=2, axis=1, keepdims=True)
+
+    def test_random_data(self):
+        """Test viterbi search on some random data"""
+        seq, path = viterbi_search(self.probs, self.alphabet)
+        self.assertEqual(len(seq), len(path))
+        self.assertEqual(len(set(seq)), len(self.alphabet) - 1)
+
+    def test_not_enough_args(self):
+        """Not enough arguments provided"""
+        with self.assertRaises(TypeError):
+            viterbi_search(self.probs)
+
+    def test_alphabet_too_small(self):
+        """When the alphabet is too small, it should raise"""
+        with self.assertRaises(ValueError):
+            viterbi_search(self.probs, "NACG")
+
+    def test_alphabet_too_large(self):
+        """When the alphabet is too large, it should raise"""
+        with self.assertRaises(ValueError):
+            viterbi_search(self.probs, "NACGTR")
+
+    def test_beam_search_path(self):
+        """data with a predefined path"""
+        w = 5000
+        x = np.zeros((w, len(self.alphabet)), np.float32)
+        x[:, 0] = 0.5  # set stay prob
+
+        # emit a base evenly spaced along w
+        emit = np.arange(0, w, len(self.alphabet) - 1)
+        for base, pos in enumerate(emit):
+            x[pos, base % 4 + 1] = 1.0
+
+        seq, path = viterbi_search(x, self.alphabet)
+        np.testing.assert_array_equal(emit, path)
+        self.assertEqual(len(seq), len(path))
+
+    def test_repeat_sequence_path(self):
+        """test with a repeated sequence """
+        w = 20
+        x = np.zeros((w, len(self.alphabet)), np.float32)
+        x[:, 0] = 0.5  # set stay prob
+
+        expected_path = [6, 13, 18]
+        for idx in expected_path:
+            x[idx, 0] = 0.0
+            x[idx, 1] = 1.0
+
+        seq, path = viterbi_search(x, self.alphabet)
+
+        self.assertEqual(seq, 'AAA')
+        self.assertEqual(len(seq), len(path))
+        self.assertEqual(path, expected_path)
+
+    def test_repeat_sequence_path_with_multi_char_alpha(self):
+        """Test that a multi-char alphabet works"""
+        w = 20
+        self.alphabet = ["N", "AAA", "CCC", "GGG", "TTTT"]
+        x = np.zeros((w, len(self.alphabet)), np.float32)
+        x[:, 0] = 0.5  # set stay prob
+
+        alphabet_idx = 1
+        expected_path = [6, 13, 18]
+        for idx in expected_path:
+            x[idx, 0] = 0.0
+            x[idx, alphabet_idx] = 1.0
+            alphabet_idx += 1
+
+        seq, path = viterbi_search(x, self.alphabet)
+
+        self.assertEqual(seq, 'AAACCCGGG')
+        self.assertEqual(path, expected_path)
+
+    def test_beam_off_path(self):
+        """a set a probabilities where a viterbi search would produce the wrong result"""
+        x = np.array([
+            [0.7, 0.1, 0.2],
+            [0.7, 0.1, 0.2],
+            [0.2, 0.3, 0.5],
+            [0.2, 0.2, 0.6],
+            [0.3, 0.3, 0.4],
+            [0.2, 0.2, 0.6],
+            [0.2, 0.3, 0.5],
+            [0.7, 0.1, 0.2],
+            [0.7, 0.1, 0.2],
+        ], np.float32)
+
+        seq, path = viterbi_search(x, "NAB")
+        self.assertEqual(seq, "B")
+
+class Test2DBeamSearch(TestCase):
+    def setUp(self):
+        self.beam_size = 5
+        self.alphabet = "NACGT"
+        self.beam_cut_threshold = 0.1
+        self.probs_1 = self.get_random_data()
+        self.probs_2 = self.get_random_data()
+
+    def get_random_data(self, samples=100):
+        x = np.random.rand(samples, len(self.alphabet)).astype(np.float32)
+        return x / np.linalg.norm(x, ord=2, axis=1, keepdims=True)
+
+    def test_nans(self):
+        """beam_search_2d is passed NaN values"""
+        self.probs_1.fill(np.NaN)
+        with self.assertRaisesRegex(RuntimeError, "Failed to compare values"):
+            beam_search_2d(self.probs_1, self.probs_2, self.alphabet)
+
+    def test_identical_data(self):
+        """Test 2D beam search on the same data twice"""
+        x = np.array([
+            [0.01, 0.98, 0.01],
+            [0.01, 0.98, 0.01],
+            [0.01, 0.98, 0.01],
+            [0.01, 0.98, 0.01],
+            [0.9,  0.05, 0.05],
+            [0.7,  0.05, 0.35],
+            [0.9,  0.05, 0.05],
+            [0.01, 0.98, 0.01],
+            [0.01, 0.98, 0.01],
+            [0.01, 0.98, 0.01],
+            [0.01, 0.01, 0.98],
+            [0.01, 0.01, 0.98],
+            [0.01, 0.01, 0.98],
+            [0.01, 0.01, 0.98],
+        ], np.float32)
+        seq = beam_search_2d(x, x, "NAB")
+        self.assertEqual("AAB", seq)
+
+    def test_disagreeing_data(self):
+        """Test 2D beam search on data that disagrees"""
+        x = np.array([
+            [0.01, 0.98, 0.01],
+            [0.01, 0.34, 0.65],
+            [0.01, 0.98, 0.01],
+            [0.01, 0.01, 0.98],
+        ], np.float32)
+        self.assertEqual("ABAB", beam_search(x, "NAB")[0])
+        y = np.array([
+            [0.0, 1.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 0.0, 1.0],
+        ], np.float32)
+        self.assertEqual("AB", beam_search_2d(x, y, "NAB"))
 
 
 if __name__ == '__main__':

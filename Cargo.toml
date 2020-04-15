@@ -13,6 +13,10 @@ numpy = "0.7.0"
 ndarray = { version = "0.13.0", features = ["blas"] }
 pyo3 = { version = "0.8.5", features = ["extension-module"] }
 
+[features]
+default = ["fastexp"]
+fastexp = []
+
 [profile.release]
 lto=true
 codegen-units=1

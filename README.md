@@ -44,6 +44,10 @@ $ make test
 
 Note: You'll need a recent [rust](https://www.rust-lang.org/tools/install) compiler on your path to build the project.
 
+By default, a fast (and less accurate) version of exponentiation is used for the 2D search. This can
+be disabled by passing `--cargo-extra-args="--no-default-features"` to maturin, which provides more
+accurate calculations but makes the 2D search take about twice as long.
+
 ## Credits
 
 The original beam search implementation was developed by [@usamec](https://github.com/usamec) for [deepnano-blitz](https://github.com/fmfi-compbio/deepnano-blitz).
