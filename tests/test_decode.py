@@ -271,7 +271,7 @@ class TestViterbiSearch(TestCase):
         seq = seq[:len(path)]
 
         self.assertEqual(seq, 'AAA')
-        self.assertEqual(qual, '???')
+        self.assertEqual(qual, 'III')
         self.assertEqual(len(seq), len(path))
         self.assertEqual(path, expected_path)
 
