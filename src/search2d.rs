@@ -310,7 +310,7 @@ pub fn beam_search<D: Data<Elem = f32>, E: Data<Elem = usize>>(
     let mut next_beam = Vec::new();
     let root_secondary_probs = root_probs(
         &network_output_2.index_axis(Axis(1), 0),
-        0, //envelope[[envelope.nrows() - 1, 0]],
+        envelope[[envelope.nrows() - 1, 0]],
     );
     let network_2_len = network_output_2.shape()[0];
     let mut last_lower_bound = 0;
