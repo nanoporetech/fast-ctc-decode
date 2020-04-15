@@ -50,10 +50,13 @@ mod logspace {
                 }
             }
             // order operands by magnitude to ensure a+b produces the same answer as b+a
-            if self.0 > other.0 {
-                LogSpace(add_internal(self.0, other.0))
-            } else {
+            // NB: the comparison is done such that if there is a NaN, it will end up being the
+            // first argument to add_internal(), and thus be propagated properly (fastexp() doesn't
+            // propagate NaNs).
+            if self.0 <= other.0 {
                 LogSpace(add_internal(other.0, self.0))
+            } else {
+                LogSpace(add_internal(self.0, other.0))
             }
         }
     }
@@ -315,11 +318,10 @@ pub fn beam_search<D: Data<Elem = f32>, E: Data<Elem = usize>>(
     let network_2_len = network_output_2.shape()[0];
     let mut last_lower_bound = 0;
 
-    for (_idx, (labelling_probs, bounds)) in network_output_1
+    for (labelling_probs, bounds) in network_output_1
         .slice(s![..;-1, ..])
         .outer_iter()
         .zip(envelope.outer_iter().rev())
-        .enumerate()
     {
         next_beam.clear();
 
