@@ -187,6 +187,7 @@ class Test1DBeamSearch(TestCase):
         self.assertEqual(len(seq), len(path))
         self.assertEqual(path, expected_path)
 
+
 class TestViterbiSearch(TestCase):
     def setUp(self):
         self.alphabet = "NACGT"
@@ -201,6 +202,11 @@ class TestViterbiSearch(TestCase):
         seq, path = viterbi_search(self.probs, self.alphabet)
         self.assertEqual(len(seq), len(path))
         self.assertEqual(len(set(seq)), len(self.alphabet) - 1)
+
+    def test_random_data(self):
+        """Test viterbi search on some random data with qstring generation"""
+        seq, path = viterbi_search(self.probs, self.alphabet, qstring=True)
+        self.assertEqual(len(seq), len(path) * 2)
 
     def test_not_enough_args(self):
         """Not enough arguments provided"""
@@ -248,6 +254,27 @@ class TestViterbiSearch(TestCase):
         self.assertEqual(seq, 'AAA')
         self.assertEqual(len(seq), len(path))
         self.assertEqual(path, expected_path)
+
+    def test_repeat_sequence_path_with_qstring(self):
+        """test with a repeated sequence with qstring generation """
+        w = 20
+        x = np.zeros((w, len(self.alphabet)), np.float32)
+        x[:, 0] = 0.5  # set stay prob
+
+        expected_path = [6, 13, 18]
+        for idx in expected_path:
+            x[idx, 0] = 0.0
+            x[idx, 1] = 1.0
+
+        seq, path = viterbi_search(x, self.alphabet, qstring=True)
+        qual = seq[len(path):]
+        seq = seq[:len(path)]
+
+        self.assertEqual(seq, 'AAA')
+        self.assertEqual(qual, '???')
+        self.assertEqual(len(seq), len(path))
+        self.assertEqual(path, expected_path)
+
 
     def test_repeat_sequence_path_with_multi_char_alpha(self):
         """Test that a multi-char alphabet works"""

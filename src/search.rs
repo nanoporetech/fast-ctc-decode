@@ -24,7 +24,7 @@ impl SearchPoint {
     }
 }
 
-/// Convert probability into a ascii encoded phred quality score between 1 and 40.
+/// Convert probability into an ASCII encoded phred quality score between 0 and 40.
 pub fn phred(prob: f32) -> char {
     let max = 1e-4;
     let bias = 2.0;
@@ -242,6 +242,10 @@ mod tests {
         let (seq, starts) = viterbi_search(&network_output, &alphabet, false).unwrap();
         assert_eq!(seq, "GGAG");
         assert_eq!(starts, vec![0, 5, 7, 9]);
+
+        let (seq, starts) = viterbi_search(&network_output, &alphabet, true).unwrap();
+        assert_eq!(seq, "GGAG%$%'");
+        assert_eq!(starts, vec![0, 5, 7, 9]);
     }
 
     #[test]
@@ -264,6 +268,10 @@ mod tests {
         ];
         let (seq, starts) = viterbi_search(&network_output, &alphabet, false).unwrap();
         assert_eq!(seq, "GGAG");
+        assert_eq!(starts, vec![2, 7, 9, 11]);
+
+        let (seq, starts) = viterbi_search(&network_output, &alphabet, true).unwrap();
+        assert_eq!(seq, "GGAG%$%'");
         assert_eq!(starts, vec![2, 7, 9, 11]);
     }
 
