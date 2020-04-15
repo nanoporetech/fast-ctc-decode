@@ -16,6 +16,8 @@ use pyo3::types::PySequence;
 use pyo3::wrap_pyfunction;
 use std::fmt;
 
+#[cfg(feature = "fastexp")]
+mod fastexp;
 mod search;
 mod search2d;
 mod tree;

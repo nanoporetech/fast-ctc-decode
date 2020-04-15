@@ -6,6 +6,16 @@ use ndarray::{ArrayBase, Axis, Data, Ix1, Ix2};
 mod logspace {
     use std::ops::{Add, AddAssign, Mul, MulAssign};
 
+    #[cfg(feature = "fastexp")]
+    fn exp(a: f32) -> f32 {
+        use crate::fastexp::FastExp;
+        a.fastexp()
+    }
+    #[cfg(not(feature = "fastexp"))]
+    fn exp(a: f32) -> f32 {
+        a.exp()
+    }
+
     #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
     pub struct LogSpace(f32);
 
@@ -32,14 +42,16 @@ mod logspace {
         type Output = Self;
         fn add(self, other: Self) -> Self {
             fn add_internal(big: f32, small: f32) -> f32 {
-                big + (small - big).exp().ln_1p()
+                if small == std::f32::NEG_INFINITY {
+                    // -inf is the additive unit (it represents zero probability)
+                    big
+                } else {
+                    big + exp(small - big).ln_1p()
+                }
             }
             // order operands by magnitude to ensure a+b produces the same answer as b+a
             if self.0 > other.0 {
                 LogSpace(add_internal(self.0, other.0))
-            } else if self.0 == std::f32::NEG_INFINITY {
-                // shortcut - also ensures LogSpace(-inf) + LogSpace(-inf) does not produce NaN
-                other
             } else {
                 LogSpace(add_internal(other.0, self.0))
             }
