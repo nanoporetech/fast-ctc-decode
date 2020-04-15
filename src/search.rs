@@ -24,6 +24,16 @@ impl SearchPoint {
     }
 }
 
+/// Convert probability into a ascii encoded phred quality score between 1 and 40.
+pub fn phred(prob: f32) -> char {
+    let max = 1e-4;
+    let bias = 2.0;
+    let scale = 0.7;
+    let p = if 1.0 - prob < max { max } else { 1.0 - prob };
+    let q = -10.0 * p.log10() * scale + bias;
+    std::char::from_u32(q as u32 + 33).unwrap()
+}
+
 pub fn beam_search<D: Data<Elem = f32>>(
     network_output: &ArrayBase<D, Ix2>,
     alphabet: &[String],
@@ -176,25 +186,34 @@ fn find_max(
 pub fn viterbi_search<D: Data<Elem = f32>>(
     network_output: &ArrayBase<D, Ix2>,
     alphabet: &[String],
+    qstring: bool,
 ) -> Result<(String, Vec<usize>), SearchError> {
     assert!(!alphabet.is_empty());
     assert!(!network_output.is_empty());
     assert_eq!(alphabet.len(), network_output.shape()[1]);
 
     let mut path = Vec::new();
+    let mut quality = String::new();
     let mut sequence = String::new();
 
     let mut last_label = None;
     for (idx, pr) in network_output.outer_iter().enumerate() {
-        let (label, _) = Zip::indexed(pr)
+        let (label, prob) = Zip::indexed(pr)
             .fold_while(None, find_max)
             .into_inner()
             .unwrap(); // only an empty network_output could give us None
         if label != 0 && last_label != Some(label) {
             sequence.push_str(&alphabet[label]);
             path.push(idx);
+            if qstring {
+                quality.push(phred(prob));
+            }
         }
         last_label = Some(label);
+    }
+
+    if qstring {
+        sequence.push_str(&quality);
     }
 
     Ok((sequence, path))
@@ -220,7 +239,7 @@ mod tests {
             [0.8f32, 0.1, 0.1], // N
             [0.1f32, 0.1, 0.8], // G
         ];
-        let (seq, starts) = viterbi_search(&network_output, &alphabet).unwrap();
+        let (seq, starts) = viterbi_search(&network_output, &alphabet, false).unwrap();
         assert_eq!(seq, "GGAG");
         assert_eq!(starts, vec![0, 5, 7, 9]);
     }
@@ -243,7 +262,7 @@ mod tests {
             [0.1f32, 0.1, 0.8], // G
             [0.4f32, 0.3, 0.3], // N
         ];
-        let (seq, starts) = viterbi_search(&network_output, &alphabet).unwrap();
+        let (seq, starts) = viterbi_search(&network_output, &alphabet, false).unwrap();
         assert_eq!(seq, "GGAG");
         assert_eq!(starts, vec![2, 7, 9, 11]);
     }
@@ -258,7 +277,7 @@ mod tests {
             (_, 0) => 1.0f32,
             (_, _) => 0.0f32,
         });
-        b.iter(|| viterbi_search(&network_output, &alphabet));
+        b.iter(|| viterbi_search(&network_output, &alphabet, false));
     }
 
     // This one changes label at every data point, so result contruction has the maximum possible
@@ -274,6 +293,6 @@ mod tests {
             (n, 2) if n % 2 != 0 => 0.0f32,
             _ => 0.0f32,
         });
-        b.iter(|| viterbi_search(&network_output, &alphabet));
+        b.iter(|| viterbi_search(&network_output, &alphabet, false));
     }
 }

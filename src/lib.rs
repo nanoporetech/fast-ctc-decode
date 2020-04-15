@@ -62,6 +62,8 @@ fn seq_to_vec(seq: &PySequence) -> PyResult<Vec<String>> {
 ///     network_output (numpy.ndarray): The 2D array output of the neural network.
 ///     alphabet (sequence): The labels (including the blank label, which must be first) in the
 ///         order given on the inner axis of `network_output`.
+///     qstring (bool): If `True` a quality string will be appended to the returned sequence
+///         which contains an ascii encoded phred quality score for each predicted label.
 ///
 /// Returns:
 ///     tuple of (str, numpy.ndarray): The decoded sequence and an array of the final
@@ -69,11 +71,12 @@ fn seq_to_vec(seq: &PySequence) -> PyResult<Vec<String>> {
 ///
 /// Raises:
 ///     ValueError: The constraints on the arguments have not been met.
-#[pyfunction]
-#[text_signature = "(network_output, alphabet)"]
+#[pyfunction(qstring = false)]
+#[text_signature = "(network_output, alphabet, qstring=False)"]
 fn viterbi_search(
     network_output: &PyArray2<f32>,
     alphabet: &PySequence,
+    qstring: bool,
 ) -> PyResult<(String, Vec<usize>)> {
     let alphabet = seq_to_vec(alphabet)?;
     if alphabet.is_empty() {
@@ -83,7 +86,7 @@ fn viterbi_search(
             "alphabet size does not match probability matrix dimensions",
         ))
     } else {
-        search::viterbi_search(&network_output.as_array(), &alphabet)
+        search::viterbi_search(&network_output.as_array(), &alphabet, qstring)
             .map_err(|e| RuntimeError::py_err(format!("{}", e)))
     }
 }
