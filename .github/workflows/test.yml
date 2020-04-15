@@ -15,6 +15,8 @@ jobs:
         with:
           toolchain: nightly
           default: true
+      - name: Unit tests
+        run: cargo test
       - uses: actions/setup-python@v1
         with:
           python-version: '3.7'
@@ -24,5 +26,4 @@ jobs:
           source venv3/bin/activate
           python3 -m pip install maturin numpy
           maturin develop
-          cargo test
           python3 tests/test_decode.py
