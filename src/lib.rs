@@ -162,6 +162,9 @@ fn beam_search(
 /// outputs. This could be the same network run over two different samplings of the same sequence,
 /// or two different networks run over the same input, for example.
 ///
+/// It is an implementation of the algorithm developed by Silvestre-Ryan and Holmes
+/// (https://doi.org/10.1101/2020.02.25.956771).
+///
 /// If no envelope is provided, a default one will be used. For now, that will just search the
 /// whole of `network_output_2` at every step, but in future it may calculate a more constrained
 /// envelope. For consistent results, you should provide an envelope.
