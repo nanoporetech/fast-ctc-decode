@@ -29,7 +29,7 @@ pub fn phred(prob: f32, qscale: f32, qbias: f32) -> char {
     let max = 1e-4;
     let p = if 1.0 - prob < max { max } else { 1.0 - prob };
     let q = -10.0 * p.log10() * qscale + qbias;
-    std::char::from_u32(q as u32 + 33).unwrap()
+    std::char::from_u32(q.round() as u32 + 33).unwrap()
 }
 
 pub fn beam_search<D: Data<Elem = f32>>(
@@ -197,19 +197,44 @@ pub fn viterbi_search<D: Data<Elem = f32>>(
     let mut sequence = String::new();
 
     let mut last_label = None;
+    let mut label_prob_count = 0;
+    let mut label_prob_total = 0.0;
+
     for (idx, pr) in network_output.outer_iter().enumerate() {
         let (label, prob) = Zip::indexed(pr)
             .fold_while(None, find_max)
             .into_inner()
             .unwrap(); // only an empty network_output could give us None
+
         if label != 0 && last_label != Some(label) {
+            if label_prob_count > 0 {
+                quality.push(phred(
+                    label_prob_total / (label_prob_count as f32),
+                    qscale,
+                    qbias,
+                ));
+                label_prob_total = 0.0;
+                label_prob_count = 0;
+            }
+
             sequence.push_str(&alphabet[label]);
             path.push(idx);
-            if qstring {
-                quality.push(phred(prob, qscale, qbias));
-            }
         }
+
+        if label != 0 {
+            label_prob_total += prob;
+            label_prob_count += 1;
+        }
+
         last_label = Some(label);
+    }
+
+    if label_prob_count > 0 {
+        quality.push(phred(
+            label_prob_total / (label_prob_count as f32),
+            qscale,
+            qbias,
+        ));
     }
 
     if qstring {
@@ -223,6 +248,21 @@ pub fn viterbi_search<D: Data<Elem = f32>>(
 mod tests {
     use super::*;
     use test::Bencher;
+
+    #[test]
+    fn test_phred_scores() {
+        let qbias = 0.0;
+        let qscale = 1.0;
+        assert_eq!('!', phred(0.0, qscale, qbias));
+        assert_eq!('$', phred(0.5, qscale, qbias));
+        assert_eq!('+', phred(1.0 - 1e-1, qscale, qbias));
+        assert_eq!('5', phred(1.0 - 1e-2, qscale, qbias));
+        assert_eq!('?', phred(1.0 - 1e-3, qscale, qbias));
+        assert_eq!('I', phred(1.0 - 1e-4, qscale, qbias));
+        assert_eq!('I', phred(1.0 - 1e-5, qscale, qbias));
+        assert_eq!('I', phred(1.0 - 1e-6, qscale, qbias));
+        assert_eq!('I', phred(1.0, qscale, qbias));
+    }
 
     #[test]
     fn test_viterbi() {
@@ -248,7 +288,7 @@ mod tests {
 
         let (seq, starts) =
             viterbi_search(&network_output, &alphabet, true, qscale, qbias).unwrap();
-        assert_eq!(seq, "GGAG$#$'");
+        assert_eq!(seq, "GGAG%$$(");
         assert_eq!(starts, vec![0, 5, 7, 9]);
     }
 
@@ -279,7 +319,7 @@ mod tests {
 
         let (seq, starts) =
             viterbi_search(&network_output, &alphabet, true, qscale, qbias).unwrap();
-        assert_eq!(seq, "GGAG$#$'");
+        assert_eq!(seq, "GGAG%$$(");
         assert_eq!(starts, vec![2, 7, 9, 11]);
     }
 

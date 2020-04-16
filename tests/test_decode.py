@@ -275,6 +275,47 @@ class TestViterbiSearch(TestCase):
         self.assertEqual(len(seq), len(path))
         self.assertEqual(path, expected_path)
 
+    def test_mean_qscores(self):
+        """ test mean qscore generation """
+        w = 20
+        x = np.zeros((w, len(self.alphabet)), np.float32)
+        x[:, 0] = 0.5  # set stay prob
+
+        # Q10 = "5"
+        x[3, 0] = 0.0
+        x[3, 1] = 0.99
+        x[4, 0] = 0.0
+        x[4, 1] = 0.99
+
+        # Q20 = "?"
+        x[6, 0] = 0.0
+        x[6, 2] = 0.999
+        x[7, 0] = 0.0
+        x[7, 2] = 0.999
+
+        # Q5 = "&"
+        x[9, 0] = 0.0
+        x[9, 4] = 0.6
+        x[10, 0] = 0.0
+        x[10, 4] = 0.7
+        x[11, 0] = 0.0
+        x[11, 4] = 0.8
+
+        # Q3 = "$"
+        x[13, 0] = 0.0
+        x[13, 4] = 0.4
+        x[14, 0] = 0.0
+        x[14, 4] = 0.5
+        x[15, 0] = 0.0
+        x[15, 4] = 0.6
+
+        seq, path = viterbi_search(x, self.alphabet, qstring=True)
+        qual = seq[len(path):]
+        seq = seq[:len(path)]
+
+        self.assertEqual(seq, 'ACTT')
+        self.assertEqual(qual, '5?&$')
+        self.assertEqual(len(seq), len(path))
 
     def test_repeat_sequence_path_with_multi_char_alpha(self):
         """Test that a multi-char alphabet works"""
@@ -311,6 +352,7 @@ class TestViterbiSearch(TestCase):
 
         seq, path = viterbi_search(x, "NAB")
         self.assertEqual(seq, "B")
+
 
 class Test2DBeamSearch(TestCase):
     def setUp(self):
