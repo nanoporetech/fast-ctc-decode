@@ -24,6 +24,14 @@ impl SearchPoint {
     }
 }
 
+/// Convert probability into an ASCII encoded phred quality score between 0 and 40.
+pub fn phred(prob: f32, qscale: f32, qbias: f32) -> char {
+    let max = 1e-4;
+    let p = if 1.0 - prob < max { max } else { 1.0 - prob };
+    let q = -10.0 * p.log10() * qscale + qbias;
+    std::char::from_u32(q.round() as u32 + 33).unwrap()
+}
+
 pub fn beam_search<D: Data<Elem = f32>>(
     network_output: &ArrayBase<D, Ix2>,
     alphabet: &[String],
@@ -178,25 +186,61 @@ fn find_max(
 pub fn viterbi_search<D: Data<Elem = f32>>(
     network_output: &ArrayBase<D, Ix2>,
     alphabet: &[String],
+    qstring: bool,
+    qscale: f32,
+    qbias: f32,
 ) -> Result<(String, Vec<usize>), SearchError> {
     assert!(!alphabet.is_empty());
     assert!(!network_output.is_empty());
     assert_eq!(alphabet.len(), network_output.shape()[1]);
 
     let mut path = Vec::new();
+    let mut quality = String::new();
     let mut sequence = String::new();
 
     let mut last_label = None;
+    let mut label_prob_count = 0;
+    let mut label_prob_total = 0.0;
+
     for (idx, pr) in network_output.outer_iter().enumerate() {
-        let (label, _) = Zip::indexed(pr)
+        let (label, prob) = Zip::indexed(pr)
             .fold_while(None, find_max)
             .into_inner()
             .unwrap(); // only an empty network_output could give us None
+
         if label != 0 && last_label != Some(label) {
+            if label_prob_count > 0 {
+                quality.push(phred(
+                    label_prob_total / (label_prob_count as f32),
+                    qscale,
+                    qbias,
+                ));
+                label_prob_total = 0.0;
+                label_prob_count = 0;
+            }
+
             sequence.push_str(&alphabet[label]);
             path.push(idx);
         }
+
+        if label != 0 {
+            label_prob_total += prob;
+            label_prob_count += 1;
+        }
+
         last_label = Some(label);
+    }
+
+    if label_prob_count > 0 {
+        quality.push(phred(
+            label_prob_total / (label_prob_count as f32),
+            qscale,
+            qbias,
+        ));
+    }
+
+    if qstring {
+        sequence.push_str(&quality);
     }
 
     Ok((sequence, path))
@@ -208,7 +252,24 @@ mod tests {
     use test::Bencher;
 
     #[test]
+    fn test_phred_scores() {
+        let qbias = 0.0;
+        let qscale = 1.0;
+        assert_eq!('!', phred(0.0, qscale, qbias));
+        assert_eq!('$', phred(0.5, qscale, qbias));
+        assert_eq!('+', phred(1.0 - 1e-1, qscale, qbias));
+        assert_eq!('5', phred(1.0 - 1e-2, qscale, qbias));
+        assert_eq!('?', phred(1.0 - 1e-3, qscale, qbias));
+        assert_eq!('I', phred(1.0 - 1e-4, qscale, qbias));
+        assert_eq!('I', phred(1.0 - 1e-5, qscale, qbias));
+        assert_eq!('I', phred(1.0 - 1e-6, qscale, qbias));
+        assert_eq!('I', phred(1.0, qscale, qbias));
+    }
+
+    #[test]
     fn test_viterbi() {
+        let qbias = 0.0;
+        let qscale = 1.0;
         let alphabet = vec![String::from("N"), String::from("A"), String::from("G")];
         let network_output = array![
             [0.0f32, 0.4, 0.6], // G
@@ -222,13 +283,21 @@ mod tests {
             [0.8f32, 0.1, 0.1], // N
             [0.1f32, 0.1, 0.8], // G
         ];
-        let (seq, starts) = viterbi_search(&network_output, &alphabet).unwrap();
+        let (seq, starts) =
+            viterbi_search(&network_output, &alphabet, false, qscale, qbias).unwrap();
         assert_eq!(seq, "GGAG");
+        assert_eq!(starts, vec![0, 5, 7, 9]);
+
+        let (seq, starts) =
+            viterbi_search(&network_output, &alphabet, true, qscale, qbias).unwrap();
+        assert_eq!(seq, "GGAG%$$(");
         assert_eq!(starts, vec![0, 5, 7, 9]);
     }
 
     #[test]
     fn test_viterbi_blank_bounds() {
+        let qbias = 0.0;
+        let qscale = 1.0;
         let alphabet = vec![String::from("N"), String::from("A"), String::from("G")];
         let network_output = array![
             [0.4f32, 0.3, 0.3], // N
@@ -245,8 +314,14 @@ mod tests {
             [0.1f32, 0.1, 0.8], // G
             [0.4f32, 0.3, 0.3], // N
         ];
-        let (seq, starts) = viterbi_search(&network_output, &alphabet).unwrap();
+        let (seq, starts) =
+            viterbi_search(&network_output, &alphabet, false, qscale, qbias).unwrap();
         assert_eq!(seq, "GGAG");
+        assert_eq!(starts, vec![2, 7, 9, 11]);
+
+        let (seq, starts) =
+            viterbi_search(&network_output, &alphabet, true, qscale, qbias).unwrap();
+        assert_eq!(seq, "GGAG%$$(");
         assert_eq!(starts, vec![2, 7, 9, 11]);
     }
 
@@ -255,12 +330,14 @@ mod tests {
     #[bench]
     fn benchmark_trivial_viterbi(b: &mut Bencher) {
         use ndarray::Array2;
+        let qbias = 0.0;
+        let qscale = 1.0;
         let alphabet = vec![String::from("N"), String::from("A"), String::from("G")];
         let network_output = Array2::from_shape_fn((1000, 3), |p| match p {
             (_, 0) => 1.0f32,
             (_, _) => 0.0f32,
         });
-        b.iter(|| viterbi_search(&network_output, &alphabet));
+        b.iter(|| viterbi_search(&network_output, &alphabet, false, qscale, qbias));
     }
 
     // This one changes label at every data point, so result contruction has the maximum possible
@@ -268,6 +345,8 @@ mod tests {
     #[bench]
     fn benchmark_unstable_viterbi(b: &mut Bencher) {
         use ndarray::Array2;
+        let qbias = 0.0;
+        let qscale = 1.0;
         let alphabet = vec![String::from("N"), String::from("A"), String::from("G")];
         let network_output = Array2::from_shape_fn((1000, 3), |p| match p {
             (n, 1) if n % 2 == 0 => 0.0f32,
@@ -276,6 +355,6 @@ mod tests {
             (n, 2) if n % 2 != 0 => 0.0f32,
             _ => 0.0f32,
         });
-        b.iter(|| viterbi_search(&network_output, &alphabet));
+        b.iter(|| viterbi_search(&network_output, &alphabet, false, qscale, qbias));
     }
 }
