@@ -29,7 +29,7 @@ $ pip install fast-ctc-decode
 
 | Implementation       | Time (s) | URL |
 | -------------------- | -------- | --- |
-! Viterbi (Rust)       |   0.0003 | [nanoporetech/fast-ctc-decode](https://github.com/nanoporetech/fast-ctc-decode.git) |
+| Viterbi (Rust)       |   0.0003 | [nanoporetech/fast-ctc-decode](https://github.com/nanoporetech/fast-ctc-decode.git) |
 | Viterbi (Python)     |   0.0022 |     |
 | Beam Search (Rust)   |   0.0033 | [nanoporetech/fast-ctc-decode](https://github.com/nanoporetech/fast-ctc-decode.git) |
 | Beam Search (C++)    |   0.1034 | [parlance/ctcdecode](https://github.com/parlance/ctcdecode) |
