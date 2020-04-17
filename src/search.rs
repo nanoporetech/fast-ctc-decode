@@ -40,7 +40,6 @@ pub fn beam_search<D: Data<Elem = f32>>(
 ) -> Result<(String, Vec<usize>), SearchError> {
     // alphabet size minus the blank label
     let alphabet_size = alphabet.len() - 1;
-    let duration = network_output.nrows();
 
     let mut suffix_tree = SuffixTree::new(alphabet_size);
     let mut beam = vec![SearchPoint {
@@ -50,11 +49,8 @@ pub fn beam_search<D: Data<Elem = f32>>(
     }];
     let mut next_beam = Vec::new();
 
-    for (idx, pr) in network_output.slice(s![..;-1, ..]).outer_iter().enumerate() {
+    for (idx, pr) in network_output.outer_iter().enumerate() {
         next_beam.clear();
-
-        // forward index in time
-        let fidx = duration - idx - 1;
 
         for &SearchPoint {
             node,
@@ -84,7 +80,7 @@ pub fn beam_search<D: Data<Elem = f32>>(
                     });
                     let new_node_idx = suffix_tree.get_child(node, label).or_else(|| {
                         if gap_prob > 0.0 {
-                            Some(suffix_tree.add_node(node, label, fidx))
+                            Some(suffix_tree.add_node(node, label, idx))
                         } else {
                             None
                         }
@@ -100,7 +96,7 @@ pub fn beam_search<D: Data<Elem = f32>>(
                 } else {
                     let new_node_idx = suffix_tree
                         .get_child(node, label)
-                        .unwrap_or_else(|| suffix_tree.add_node(node, label, fidx));
+                        .unwrap_or_else(|| suffix_tree.add_node(node, label, idx));
 
                     next_beam.push(SearchPoint {
                         node: new_node_idx,
@@ -163,7 +159,8 @@ pub fn beam_search<D: Data<Elem = f32>>(
         }
     }
 
-    Ok((sequence, path))
+    path.reverse();
+    Ok((sequence.chars().rev().collect::<String>(), path))
 }
 
 fn find_max(
