@@ -43,13 +43,13 @@ pub struct SuffixTree<T> {
     root_children: Vec<i32>,
 }
 
-pub struct SuffixTreeIter<'a, T: Copy> {
+pub struct SuffixTreeIter<'a, T> {
     nodes: &'a Vec<LabelNode<T>>,
     next: i32,
 }
 
-impl<'a, T: Copy> Iterator for SuffixTreeIter<'a, T> {
-    type Item = (usize, T);
+impl<'a, T> Iterator for SuffixTreeIter<'a, T> {
+    type Item = (usize, &'a T);
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.next >= 0 {
@@ -57,7 +57,7 @@ impl<'a, T: Copy> Iterator for SuffixTreeIter<'a, T> {
             // next <= nodes.len()
             let node = &self.nodes[self.next as usize];
             self.next = node.parent;
-            Some((node.label, node.data))
+            Some((node.label, &node.data))
         } else {
             None
         }
@@ -183,9 +183,7 @@ impl<T> SuffixTree<T> {
             next: node,
         }
     }
-}
 
-impl<T: Copy> SuffixTree<T> {
     pub fn iter_from(&self, node: i32) -> SuffixTreeIter<T> {
         assert!((node as usize) < self.nodes.len());
         SuffixTreeIter {
@@ -265,7 +263,8 @@ mod tests {
         let ancestor_labels: Vec<usize> = tree.iter_from_no_data(4).collect();
         assert_eq!(ancestor_labels, vec![1, 1, 0]);
 
-        let ancestor_label_and_data: Vec<(usize, i32)> = tree.iter_from(4).collect();
+        let ancestor_label_and_data: Vec<(usize, i32)> =
+            tree.iter_from(4).map(|(x, &y)| (x, y)).collect();
         assert_eq!(ancestor_label_and_data, vec![(1, 104), (1, 103), (0, 100)]);
     }
 }
