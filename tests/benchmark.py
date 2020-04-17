@@ -3,16 +3,23 @@ import time
 import numpy as np
 from itertools import groupby
 
-from fast_ctc_decode import beam_search
+from fast_ctc_decode import beam_search, viterbi_search
 
-def decode_ctc_greedy(predictions, labels, *args):
+def decode_ctc_greedy_py(predictions, labels, *args):
     """
-    Argmax decoder with collapsing repeats
+    Argmax decoder with collapsing repeats in Python
     """
     path = np.argmax(predictions, axis=1)
     return ''.join([labels[b] for b, g in groupby(path) if b])
 
-TESTS = [decode_ctc_greedy, beam_search]
+def decode_ctc_greedy_rust(predictions, labels, *args):
+    """
+    Argmax decoder with collapsing repeats in Rust
+    """
+    seq, path = viterbi_search(predictions, labels)
+    return seq
+
+TESTS = [decode_ctc_greedy_rust, decode_ctc_greedy_py, beam_search]
 
 try:
     import torch
@@ -73,6 +80,6 @@ if __name__ == '__main__':
         timings = []
         for _ in range(n):
             timings.append(benchmark(f, x, beam_size, prune, limit=limit))
-        print('{:18s}: mean(sd) of {} runs: {:2.6f}({:2.6f})'.format(
+        print('{:23s}: mean(sd) of {} runs: {:2.6f}({:2.6f})'.format(
             f.__name__, n, np.mean(timings), np.std(timings))
         )
