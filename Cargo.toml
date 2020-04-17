@@ -1,6 +1,6 @@
 [package]
 name = "fast_ctc_decode"
-version = "0.2.4"
+version = "0.2.5"
 authors = ["Vlado Boza <bozavlado@gmail.com>", "Chris Seymour <chris.seymour@nanoporetech.com>"]
 edition = "2018"
 
