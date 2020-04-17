@@ -176,10 +176,11 @@ class Test1DBeamSearch(TestCase):
         x = np.zeros((w, len(self.alphabet)), np.float32)
         x[:, 0] = 0.5  # set stay prob
 
+        spread = 3
         expected_path = [6, 13, 18]
         for idx in expected_path:
-            x[idx-1:idx + 1, 0] = 0.0
-            x[idx-1:idx + 1, 1] = 1.0
+            x[idx:idx + spread, 0] = 0.0
+            x[idx:idx + spread, 1] = 1.0
 
         seq, path = beam_search(x, self.alphabet, self.beam_size, self.beam_cut_threshold)
 
