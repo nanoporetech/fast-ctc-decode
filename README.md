@@ -55,7 +55,7 @@ accurate calculations but makes the 2D search take about twice as long.
 
 The original 1D beam search implementation was developed by [@usamec](https://github.com/usamec) for [deepnano-blitz](https://github.com/fmfi-compbio/deepnano-blitz).
 
-The 2D beam search is based on @jordisr and @ihh work in their [pair consensus decoding](https://doi.org/10.1101/2020.02.25.956771) paper.
+The 2D beam search is based on [@jordisr](https://github.com/jordisr) and [@ihh](https://github.com/ihh) work in their [pair consensus decoding](https://doi.org/10.1101/2020.02.25.956771) paper.
 
 ### Licence and Copyright
 (c) 2019 Oxford Nanopore Technologies Ltd.
