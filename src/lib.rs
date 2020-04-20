@@ -316,5 +316,6 @@ fn fast_ctc_decode(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(beam_search))?;
     m.add_wrapped(wrap_pyfunction!(beam_search_2d))?;
     m.add_wrapped(wrap_pyfunction!(viterbi_search))?;
+    m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     Ok(())
 }
