@@ -20,7 +20,7 @@ $ pip install fast-ctc-decode
 >>> seq
 'ACACTCGCAGCGCGATACGACTGATCGAGATATACTCAGTGTACACAGT'
 >>>
->>> seq, path = beam_search(posteriors, alphabet, beam_size=5, beam_prune_threshold=0.1)
+>>> seq, path = beam_search(posteriors, alphabet, beam_size=5, beam_cut_threshold=0.1)
 >>> seq
 'ACACTCGCAGCGCGATACGACTGATCGAGATATACTCAGTGTACACAGT'
 ```
