@@ -26,4 +26,4 @@ jobs:
           source venv3/bin/activate
           python3 -m pip install maturin numpy
           maturin develop
-	  python3 -m unittest discover tests
+          python3 -m unittest discover tests
