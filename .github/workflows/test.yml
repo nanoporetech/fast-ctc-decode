@@ -17,13 +17,26 @@ jobs:
           default: true
       - name: Unit tests
         run: cargo test
-      - uses: actions/setup-python@v1
-        with:
-          python-version: '3.7'
-      - name: Test ${{ matrix.os }} binding
-        run: |
-          python3 -m venv venv3
-          venv3\Scripts\Activate.ps1
-          python3 -m pip install maturin numpy
-          maturin develop
-          python3 -m unittest discover tests
+
+  windows-wheels:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        python-version: [3.5, 3.6, 3.7, 3.8]
+    steps:
+     - uses: actions/checkout@v1
+     - uses: actions-rs/toolchain@v1
+       with:
+         toolchain: nightly
+         default: true
+     - uses: actions/setup-python@v1
+       with:
+         python-version: ${{ matrix.python-version }}
+     - name: Build wheels
+       run: |
+         python3 -m pip install maturin
+         maturin build --release
+     - uses: actions/upload-artifact@v1
+       with:
+         name: osx-${{ matrix.python-version }}-wheel
+         path: target/wheels
