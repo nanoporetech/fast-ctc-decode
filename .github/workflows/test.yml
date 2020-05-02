@@ -23,7 +23,7 @@ jobs:
       - name: Test ${{ matrix.os }} binding
         run: |
           python3 -m venv venv3
-	  venv3\Scripts\Activate.ps1
+          venv3\Scripts\Activate.ps1
           python3 -m pip install maturin numpy
           maturin develop
           python3 -m unittest discover tests
