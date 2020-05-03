@@ -17,7 +17,7 @@ jobs:
           default: true
       - name: Unit tests
         run: cargo test
-      - uses: actions/setup-python@v1
+      - uses: actions/setup-python@v2
         with:
           python-version: '3.7'
       - name: Test ${{ matrix.os }} binding
