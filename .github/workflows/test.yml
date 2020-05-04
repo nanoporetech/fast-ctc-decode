@@ -42,7 +42,6 @@ jobs:
         with:
           python-version: '3.7'
       - name: Python unit tests
-        runs-on: windows-latest
         run: |
           python -m venv venv3
           venv3\Scripts\Activate.ps1
