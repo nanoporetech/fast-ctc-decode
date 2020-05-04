@@ -15,15 +15,36 @@ jobs:
         with:
           toolchain: nightly
           default: true
-      - name: Unit tests
+      - name: Rust unit tests
         run: cargo test
-      - uses: actions/setup-python@v1
+      - uses: actions/setup-python@v2
         with:
           python-version: '3.7'
-      - name: Test ${{ matrix.os }} binding
+      - name: Python unit tests
         run: |
           python3 -m venv venv3
           source venv3/bin/activate
           python3 -m pip install maturin numpy
           maturin develop
           python3 tests/test_decode.py
+
+  test-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          default: true
+      - name: Rust unit tests
+        run: cargo test
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.7'
+      - name: Python unit tests
+        run: |
+          python -m venv venv3
+          venv3\Scripts\Activate.ps1
+          python -m pip install maturin numpy
+          maturin develop
+          python tests/test_decode.py
