@@ -15,19 +15,24 @@ jobs:
         with:
           toolchain: nightly
           default: true
-      - name: Unit tests
+      - name: Rust unit tests
         run: cargo test
       - uses: actions/setup-python@v2
         with:
           python-version: '3.7'
-      - name: Test ${{ matrix.os }} binding
+      - name: Python unit tests
+        runs-on: [ubuntu-latest, macos-latest]
+        run: |
+          python3 -m venv venv3
+          source venv3/bin/activate
+          python3 -m pip install maturin numpy
+          maturin develop
+          python3 tests/test_decode.py
+      - name: Python unit tests
+        runs-on: windows-latest
         run: |
           python -m venv venv3
-          if ("${{ matrix.os }}" -eq "windows-latest") {
-              venv3\Scripts\Activate.ps1
-          } else {
-              source venv3/bin/activate
-          }
+          venv3\Scripts\Activate.ps1
           python -m pip install maturin numpy
           maturin develop
-          python -m unittest discover tests
+          python tests/test_decode.py
