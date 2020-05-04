@@ -26,7 +26,7 @@ jobs:
           if ("${{ matrix.os }}" -eq "windows-latest") {
               venv3\Scripts\Activate.ps1
           } else {
-	      source venv3/bin/activate
+              source venv3/bin/activate
           }
           python -m pip install maturin numpy
           maturin develop
