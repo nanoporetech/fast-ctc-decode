@@ -44,7 +44,7 @@ jobs:
          python-version: ${{ matrix.python-version }}
      - name: Build wheels
        run: |
-         python3 -m pip install maturin
+         python -m pip install maturin
          maturin build --release
      - uses: actions/upload-artifact@v1
        with:
