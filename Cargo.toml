@@ -10,7 +10,8 @@ crate-type = ["cdylib"]
 
 [dependencies]
 numpy = "0.7.0"
-ndarray = { version = "0.13.0", features = ["blas"] }
+ndarray-stats = "0.4"
+ndarray = { version = "0.14.0", features = ["blas"] }
 pyo3 = { version = "0.8.5", features = ["extension-module"] }
 
 [features]

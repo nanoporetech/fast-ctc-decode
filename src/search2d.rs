@@ -321,6 +321,7 @@ pub fn beam_search<D: Data<Elem = f32>, E: Data<Elem = usize>>(
     envelope: &ArrayBase<E, Ix2>,
     beam_size: usize,
     beam_cut_threshold_real: f32,
+    collapse_repeats: bool,
 ) -> Result<String, SearchError> {
     let network_output_1 = network_output_1_real.map(|&x| LogSpace::new(x));
     let network_output_2 = network_output_2_real.map(|&x| LogSpace::new(x));
@@ -407,7 +408,7 @@ pub fn beam_search<D: Data<Elem = f32>, E: Data<Elem = usize>>(
                 if prob < beam_cut_threshold {
                     continue;
                 }
-                if Some(label) == tip_label {
+                if collapse_repeats && Some(label) == tip_label {
                     next_beam.push(SearchPoint {
                         prob_1: ProbPair::with_label(tip.prob_1.label * prob),
                         ..tip

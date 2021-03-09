@@ -1,6 +1,7 @@
 use super::SearchError;
 use crate::tree::{SuffixTree, ROOT_NODE};
-use ndarray::{ArrayBase, Data, FoldWhile, Ix2, Zip};
+use ndarray::{ArrayBase, Axis, Data, FoldWhile, Ix1, Ix2, Ix3, Zip};
+use ndarray_stats::QuantileExt;
 
 /// A node in the labelling tree to build from.
 #[derive(Clone, Copy, Debug)]
@@ -37,6 +38,7 @@ pub fn beam_search<D: Data<Elem = f32>>(
     alphabet: &[String],
     beam_size: usize,
     beam_cut_threshold: f32,
+    collapse_repeats: bool,
 ) -> Result<(String, Vec<usize>), SearchError> {
     // alphabet size minus the blank label
     let alphabet_size = alphabet.len() - 1;
@@ -59,6 +61,7 @@ pub fn beam_search<D: Data<Elem = f32>>(
         } in &beam
         {
             let tip_label = suffix_tree.label(node);
+
             // add N to beam
             if pr[0] > beam_cut_threshold {
                 next_beam.push(SearchPoint {
@@ -72,7 +75,7 @@ pub fn beam_search<D: Data<Elem = f32>>(
                 if pr_b < beam_cut_threshold {
                     continue;
                 }
-                if Some(label) == tip_label {
+                if collapse_repeats && Some(label) == tip_label {
                     next_beam.push(SearchPoint {
                         node,
                         label_prob: label_prob * pr_b,
@@ -186,9 +189,11 @@ pub fn viterbi_search<D: Data<Elem = f32>>(
     qstring: bool,
     qscale: f32,
     qbias: f32,
+    collapse_repeats: bool,
 ) -> Result<(String, Vec<usize>), SearchError> {
     assert!(!alphabet.is_empty());
     assert!(!network_output.is_empty());
+    assert_eq!(network_output.ndim(), 2);
     assert_eq!(alphabet.len(), network_output.shape()[1]);
 
     let mut path = Vec::new();
@@ -205,7 +210,7 @@ pub fn viterbi_search<D: Data<Elem = f32>>(
             .into_inner()
             .unwrap(); // only an empty network_output could give us None
 
-        if label != 0 && last_label != Some(label) {
+        if label != 0 && (!collapse_repeats || last_label != Some(label)) {
             if label_prob_count > 0 {
                 quality.push(phred(
                     label_prob_total / (label_prob_count as f32),
@@ -243,10 +248,118 @@ pub fn viterbi_search<D: Data<Elem = f32>>(
     Ok((sequence, path))
 }
 
+pub fn viterbi_crf_search<D: Data<Elem = f32>>(
+    network_output: &ArrayBase<D, Ix3>,
+    init_state: &ArrayBase<D, Ix1>,
+    alphabet: &[String],
+    qstring: bool,
+    qscale: f32,
+    qbias: f32,
+) -> Result<(String, Vec<usize>), SearchError> {
+    assert!(!alphabet.is_empty());
+    assert!(!network_output.is_empty());
+    assert_eq!(network_output.ndim(), 3);
+    assert_eq!(network_output.shape()[2], alphabet.len());
+
+    let n_state = network_output.shape()[1] as i32;
+    let n_base = network_output.shape()[2] as i32 - 1;
+
+    let mut path = Vec::new();
+    let mut quality = String::new();
+    let mut sequence = String::new();
+    let mut state = init_state.argmax().unwrap() as i32;
+
+    for (idx, pr) in network_output.axis_iter(Axis(0)).enumerate() {
+        let label = pr.slice(s![state, ..]).argmax().unwrap();
+
+        if label > 0 {
+            path.push(idx);
+            sequence.push_str(&alphabet[label]);
+            let prob = *pr.slice(s![state, ..]).max().unwrap();
+            quality.push(phred(prob, qscale, qbias));
+            state = (state * n_base) % n_state + (label as i32 - 1);
+        }
+    }
+
+    if qstring {
+        sequence.push_str(&quality);
+    }
+
+    Ok((sequence, path))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use test::Bencher;
+
+    #[test]
+    fn test_viterbi_crf() {
+        let alphabet = vec![
+            String::from("N"),
+            String::from("A"),
+            String::from("C"),
+            String::from("G"),
+            String::from("T"),
+        ];
+
+        let network_output = array![
+            [
+                [0f32, 0., 0., 0., 0.],
+                [0f32, 0., 0., 0., 0.],
+                [1f32, 0., 0., 0., 0.], // N
+                [0f32, 0., 0., 0., 0.],
+            ],
+            [
+                [0f32, 0., 0., 0., 0.],
+                [0f32, 0., 0., 0., 0.],
+                [0f32, 0., 0.9, 0., 0.], // C
+                [0f32, 0., 0., 0., 0.],
+            ],
+            [
+                [0f32, 0., 0., 0., 0.],
+                [0f32, 0., 0., 0., 0.7], // T
+                [0f32, 0., 0., 0., 0.],
+                [0f32, 0., 0., 0., 0.],
+            ],
+            [
+                [0f32, 0., 0., 0., 0.],
+                [0f32, 0., 0., 0., 0.],
+                [0f32, 0., 0., 0., 0.],
+                [1f32, 0., 0., 0., 0.], // N
+            ],
+            [
+                [0f32, 0., 0., 0., 0.],
+                [0f32, 0., 0., 0., 0.],
+                [0f32, 0., 0., 0., 0.],
+                [0f32, 0.99, 0., 0., 0.], // A
+            ],
+            [
+                [0f32, 0.9, 0., 0., 0.], // A
+                [0f32, 0., 0., 0., 0.],
+                [0f32, 0., 0., 0., 0.],
+                [0f32, 0., 0., 0., 0.],
+            ],
+            [
+                [0f32, 0., 0., 0.999, 0.], // G
+                [0f32, 0., 0., 0., 0.],
+                [0f32, 0., 0., 0., 0.],
+                [0f32, 0., 0., 0., 0.],
+            ],
+        ];
+        let init = array![0f32, 0., 1., 0., 0.];
+        let (sequence, path) =
+            viterbi_crf_search(&network_output, &init, &alphabet, false, 1.0, 0.0).unwrap();
+
+        assert_eq!(sequence, "CTAAG");
+        assert_eq!(path, vec![1, 2, 4, 5, 6]);
+
+        let (sequence, path) =
+            viterbi_crf_search(&network_output, &init, &alphabet, true, 1.0, 0.0).unwrap();
+
+        assert_eq!(sequence, "CTAAG+&5+?");
+        assert_eq!(path, vec![1, 2, 4, 5, 6]);
+    }
 
     #[test]
     fn test_phred_scores() {
@@ -280,13 +393,14 @@ mod tests {
             [0.8f32, 0.1, 0.1], // N
             [0.1f32, 0.1, 0.8], // G
         ];
+
         let (seq, starts) =
-            viterbi_search(&network_output, &alphabet, false, qscale, qbias).unwrap();
+            viterbi_search(&network_output, &alphabet, false, qscale, qbias, true).unwrap();
         assert_eq!(seq, "GGAG");
         assert_eq!(starts, vec![0, 5, 7, 9]);
 
         let (seq, starts) =
-            viterbi_search(&network_output, &alphabet, true, qscale, qbias).unwrap();
+            viterbi_search(&network_output, &alphabet, true, qscale, qbias, true).unwrap();
         assert_eq!(seq, "GGAG%$$(");
         assert_eq!(starts, vec![0, 5, 7, 9]);
     }
@@ -297,8 +411,8 @@ mod tests {
         let qscale = 1.0;
         let alphabet = vec![String::from("N"), String::from("A"), String::from("G")];
         let network_output = array![
-            [0.4f32, 0.3, 0.3], // N
-            [0.4f32, 0.3, 0.3], // N
+            [0.6f32, 0.2, 0.2], // N
+            [0.6f32, 0.2, 0.2], // N
             [0.0f32, 0.4, 0.6], // G
             [0.0f32, 0.3, 0.7], // G
             [0.3f32, 0.3, 0.4], // G
@@ -312,14 +426,30 @@ mod tests {
             [0.4f32, 0.3, 0.3], // N
         ];
         let (seq, starts) =
-            viterbi_search(&network_output, &alphabet, false, qscale, qbias).unwrap();
+            viterbi_search(&network_output, &alphabet, false, qscale, qbias, true).unwrap();
         assert_eq!(seq, "GGAG");
         assert_eq!(starts, vec![2, 7, 9, 11]);
 
         let (seq, starts) =
-            viterbi_search(&network_output, &alphabet, true, qscale, qbias).unwrap();
+            viterbi_search(&network_output, &alphabet, true, qscale, qbias, true).unwrap();
         assert_eq!(seq, "GGAG%$$(");
         assert_eq!(starts, vec![2, 7, 9, 11]);
+
+        let (seq, starts) =
+            viterbi_search(&network_output, &alphabet, false, qscale, qbias, false).unwrap();
+        assert_eq!(seq, "GGGGGAG");
+        assert_eq!(starts, vec![2, 3, 4, 7, 8, 9, 11]);
+
+        let (seq, starts) =
+            viterbi_search(&network_output, &alphabet, true, qscale, qbias, false).unwrap();
+        assert_eq!(seq, "GGGGGAG%&##$$(");
+        assert_eq!(starts, vec![2, 3, 4, 7, 8, 9, 11]);
+
+        let (seq, _starts) = beam_search(&network_output, &alphabet, 5, 0.0, true).unwrap();
+        assert_eq!(seq, "GAGAG");
+
+        let (seq, _starts) = beam_search(&network_output, &alphabet, 5, 0.0, false).unwrap();
+        assert_eq!(seq, "GGGAGAG");
     }
 
     // This one is all blanks, and so returns no sequence (which means we're not benchmarking the
@@ -334,7 +464,7 @@ mod tests {
             (_, 0) => 1.0f32,
             (_, _) => 0.0f32,
         });
-        b.iter(|| viterbi_search(&network_output, &alphabet, false, qscale, qbias));
+        b.iter(|| viterbi_search(&network_output, &alphabet, false, qscale, qbias, true));
     }
 
     // This one changes label at every data point, so result contruction has the maximum possible
@@ -352,6 +482,6 @@ mod tests {
             (n, 2) if n % 2 != 0 => 0.0f32,
             _ => 0.0f32,
         });
-        b.iter(|| viterbi_search(&network_output, &alphabet, false, qscale, qbias));
+        b.iter(|| viterbi_search(&network_output, &alphabet, false, qscale, qbias, true));
     }
 }

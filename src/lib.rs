@@ -1,5 +1,4 @@
 #![feature(static_nobundle)]
-#![feature(clamp)]
 #![feature(test)] // benchmarking
 
 #[macro_use(s)]
@@ -9,7 +8,9 @@ extern crate ndarray;
 extern crate test; // benchmarking
 
 use ndarray::Array2;
+use numpy::PyArray1;
 use numpy::PyArray2;
+use numpy::PyArray3;
 
 use pyo3::exceptions::{RuntimeError, ValueError};
 use pyo3::prelude::*;
@@ -74,14 +75,20 @@ fn seq_to_vec(seq: &PySequence) -> PyResult<Vec<String>> {
 ///
 /// Raises:
 ///     ValueError: The constraints on the arguments have not been met.
-#[pyfunction(qstring = false, qscale = "1.0", qbias = "0.0")]
-#[text_signature = "(network_output, alphabet, qstring=False, qscale=1.0, qbias=0.0)"]
+#[pyfunction(
+    qstring = false,
+    qscale = "1.0",
+    qbias = "0.0",
+    collapse_repeats = true
+)]
+#[text_signature = "(network_output, alphabet, qstring=False, qscale=1.0, qbias=0.0, collapse_repeats=True)"]
 fn viterbi_search(
     network_output: &PyArray2<f32>,
     alphabet: &PySequence,
     qstring: bool,
     qscale: f32,
     qbias: f32,
+    collapse_repeats: bool,
 ) -> PyResult<(String, Vec<usize>)> {
     let alphabet = seq_to_vec(alphabet)?;
     if alphabet.is_empty() {
@@ -93,6 +100,37 @@ fn viterbi_search(
     } else {
         search::viterbi_search(
             &network_output.as_array(),
+            &alphabet,
+            qstring,
+            qscale,
+            qbias,
+            collapse_repeats,
+        )
+        .map_err(|e| RuntimeError::py_err(format!("{}", e)))
+    }
+}
+
+#[pyfunction(qstring = false, qscale = "1.0", qbias = "0.0")]
+#[text_signature = "(network_output, init_state, alphabet)"]
+fn viterbi_crf_search(
+    network_output: &PyArray3<f32>,
+    init_state: &PyArray1<f32>,
+    alphabet: &PySequence,
+    qstring: bool,
+    qscale: f32,
+    qbias: f32,
+) -> PyResult<(String, Vec<usize>)> {
+    let alphabet = seq_to_vec(alphabet)?;
+    if alphabet.is_empty() {
+        Err(ValueError::py_err("Empty alphabet given"))
+    } else if network_output.shape()[2] != alphabet.len() {
+        Err(ValueError::py_err(
+            "alphabet size does not match probability matrix dimensions",
+        ))
+    } else {
+        search::viterbi_crf_search(
+            &network_output.as_array(),
+            &init_state.as_array(),
             &alphabet,
             qstring,
             qscale,
@@ -132,13 +170,14 @@ fn viterbi_search(
 ///
 /// Raises:
 ///     ValueError: The constraints on the arguments have not been met.
-#[pyfunction(beam_size = "5", beam_cut_threshold = "0.0")]
-#[text_signature = "(network_output, alphabet, beam_size=5, beam_cut_threshold=0.0)"]
+#[pyfunction(beam_size = "5", beam_cut_threshold = "0.0", collapse_repeats = true)]
+#[text_signature = "(network_output, alphabet, beam_size=5, beam_cut_threshold=0.0, collapse_repeats=True)"]
 fn beam_search(
     network_output: &PyArray2<f32>,
     alphabet: &PySequence,
     beam_size: usize,
     beam_cut_threshold: f32,
+    collapse_repeats: bool,
 ) -> PyResult<(String, Vec<usize>)> {
     let alphabet = seq_to_vec(alphabet)?;
     let max_beam_cut = 1.0 / (alphabet.len() as f32);
@@ -165,6 +204,7 @@ fn beam_search(
             &alphabet,
             beam_size,
             beam_cut_threshold,
+            collapse_repeats,
         )
         .map_err(|e| RuntimeError::py_err(format!("{}", e)))
     }
@@ -204,8 +244,13 @@ fn beam_search(
 ///
 /// Raises:
 ///     ValueError: The constraints on the arguments have not been met.
-#[pyfunction(beam_size = "5", beam_cut_threshold = "0.0", envelope = "None")]
-#[text_signature = "(network_output_1, network_output_2, alphabet, envelope=None, beam_size=5, beam_cut_threshold=0.0)"]
+#[pyfunction(
+    beam_size = "5",
+    beam_cut_threshold = "0.0",
+    envelope = "None",
+    collapse_repeats = true
+)]
+#[text_signature = "(network_output_1, network_output_2, alphabet, envelope=None, beam_size=5, beam_cut_threshold=0.0, collapse_repeats=True)"]
 fn beam_search_2d(
     network_output_1: &PyArray2<f32>,
     network_output_2: &PyArray2<f32>,
@@ -213,6 +258,7 @@ fn beam_search_2d(
     envelope: Option<&PyArray2<usize>>,
     beam_size: usize,
     beam_cut_threshold: f32,
+    collapse_repeats: bool,
 ) -> PyResult<String> {
     let alphabet = seq_to_vec(alphabet)?;
     let max_beam_cut = 1.0 / (alphabet.len() as f32);
@@ -269,6 +315,7 @@ fn beam_search_2d(
             &envelope_view,
             beam_size,
             beam_cut_threshold,
+            collapse_repeats,
         )
         .map_err(|e| RuntimeError::py_err(format!("{}", e)))
     }
@@ -316,6 +363,7 @@ fn fast_ctc_decode(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(beam_search))?;
     m.add_wrapped(wrap_pyfunction!(beam_search_2d))?;
     m.add_wrapped(wrap_pyfunction!(viterbi_search))?;
+    m.add_wrapped(wrap_pyfunction!(viterbi_crf_search))?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     Ok(())
 }
