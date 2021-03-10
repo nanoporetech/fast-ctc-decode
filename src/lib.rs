@@ -112,7 +112,7 @@ fn viterbi_search(
 
 #[pyfunction(qstring = false, qscale = "1.0", qbias = "0.0")]
 #[text_signature = "(network_output, init_state, alphabet)"]
-fn viterbi_crf_search(
+fn greedy_crf_search(
     network_output: &PyArray3<f32>,
     init_state: &PyArray1<f32>,
     alphabet: &PySequence,
@@ -128,7 +128,7 @@ fn viterbi_crf_search(
             "alphabet size does not match probability matrix dimensions",
         ))
     } else {
-        search::viterbi_crf_search(
+        search::greedy_crf_search(
             &network_output.as_array(),
             &init_state.as_array(),
             &alphabet,
@@ -363,7 +363,7 @@ fn fast_ctc_decode(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(beam_search))?;
     m.add_wrapped(wrap_pyfunction!(beam_search_2d))?;
     m.add_wrapped(wrap_pyfunction!(viterbi_search))?;
-    m.add_wrapped(wrap_pyfunction!(viterbi_crf_search))?;
+    m.add_wrapped(wrap_pyfunction!(greedy_crf_search))?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     Ok(())
 }
