@@ -75,6 +75,7 @@ pub fn beam_search<D: Data<Elem = f32>>(
                 if pr_b < beam_cut_threshold {
                     continue;
                 }
+
                 if collapse_repeats && Some(label) == tip_label {
                     next_beam.push(SearchPoint {
                         node,
@@ -248,7 +249,7 @@ pub fn viterbi_search<D: Data<Elem = f32>>(
     Ok((sequence, path))
 }
 
-pub fn viterbi_crf_search<D: Data<Elem = f32>>(
+pub fn greedy_crf_search<D: Data<Elem = f32>>(
     network_output: &ArrayBase<D, Ix3>,
     init_state: &ArrayBase<D, Ix1>,
     alphabet: &[String],
@@ -294,7 +295,7 @@ mod tests {
     use test::Bencher;
 
     #[test]
-    fn test_viterbi_crf() {
+    fn test_greedy_crf() {
         let alphabet = vec![
             String::from("N"),
             String::from("A"),
@@ -349,13 +350,13 @@ mod tests {
         ];
         let init = array![0f32, 0., 1., 0., 0.];
         let (sequence, path) =
-            viterbi_crf_search(&network_output, &init, &alphabet, false, 1.0, 0.0).unwrap();
+            greedy_crf_search(&network_output, &init, &alphabet, false, 1.0, 0.0).unwrap();
 
         assert_eq!(sequence, "CTAAG");
         assert_eq!(path, vec![1, 2, 4, 5, 6]);
 
         let (sequence, path) =
-            viterbi_crf_search(&network_output, &init, &alphabet, true, 1.0, 0.0).unwrap();
+            greedy_crf_search(&network_output, &init, &alphabet, true, 1.0, 0.0).unwrap();
 
         assert_eq!(sequence, "CTAAG+&5+?");
         assert_eq!(path, vec![1, 2, 4, 5, 6]);
