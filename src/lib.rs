@@ -140,6 +140,34 @@ fn greedy_crf_search(
     }
 }
 
+#[pyfunction(beam_size = "5", beam_cut_threshold = "0.0")]
+#[text_signature = "(network_output, init_state, alphabet, beam_size, beam_cut_threshold)"]
+fn beam_crf_search(
+    network_output: &PyArray3<f32>,
+    init_state: &PyArray1<f32>,
+    alphabet: &PySequence,
+    beam_size: usize,
+    beam_cut_threshold: f32,
+) -> PyResult<(String, Vec<usize>)> {
+    let alphabet = seq_to_vec(alphabet)?;
+    if alphabet.is_empty() {
+        Err(ValueError::py_err("Empty alphabet given"))
+    } else if network_output.shape()[2] != alphabet.len() {
+        Err(ValueError::py_err(
+            "alphabet size does not match probability matrix dimensions",
+        ))
+    } else {
+        search::beam_crf_search(
+            &network_output.as_array(),
+            &init_state.as_array(),
+            &alphabet,
+            beam_size,
+            beam_cut_threshold,
+        )
+        .map_err(|e| RuntimeError::py_err(format!("{}", e)))
+    }
+}
+
 /// Perform a CTC beam search decode on an RNN output.
 ///
 /// This function does a beam search variant of the prefix search decoding mentioned (and described
@@ -364,6 +392,7 @@ fn fast_ctc_decode(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(beam_search_2d))?;
     m.add_wrapped(wrap_pyfunction!(viterbi_search))?;
     m.add_wrapped(wrap_pyfunction!(greedy_crf_search))?;
+    m.add_wrapped(wrap_pyfunction!(beam_crf_search))?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     Ok(())
 }
