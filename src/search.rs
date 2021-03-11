@@ -8,6 +8,8 @@ use ndarray_stats::QuantileExt;
 struct SearchPoint {
     /// The node search should progress from.
     node: i32,
+    /// The transition state for crf.
+    state: usize,
     /// The cumulative probability of the labelling so far for paths without any leading blank
     /// labels.
     label_prob: f32,
@@ -33,6 +35,127 @@ pub fn phred(prob: f32, qscale: f32, qbias: f32) -> char {
     std::char::from_u32(q.round() as u32 + 33).unwrap()
 }
 
+pub fn beam_crf_search<D: Data<Elem = f32>>(
+    network_output: &ArrayBase<D, Ix3>,
+    init_state: &ArrayBase<D, Ix1>,
+    alphabet: &[String],
+    beam_size: usize,
+    beam_cut_threshold: f32,
+) -> Result<(String, Vec<usize>), SearchError> {
+    assert!(!alphabet.is_empty());
+    assert!(!network_output.is_empty());
+    assert_eq!(network_output.ndim(), 3);
+    assert_eq!(network_output.shape()[2], alphabet.len());
+
+    let n_state = network_output.shape()[1];
+    let n_base = network_output.shape()[2] - 1;
+
+    let mut suffix_tree = SuffixTree::new(n_base);
+    let mut beam = vec![SearchPoint {
+        node: ROOT_NODE,
+        label_prob: *init_state.max().unwrap(),
+        gap_prob: init_state[0],
+        state: init_state.argmax().unwrap(),
+    }];
+    let mut next_beam = Vec::new();
+
+    for (idx, pp) in network_output.axis_iter(Axis(0)).enumerate() {
+        next_beam.clear();
+
+        for &SearchPoint {
+            node,
+            label_prob,
+            gap_prob,
+            state,
+        } in &beam
+        {
+            let pr = pp.slice(s![state, ..]);
+
+            // add N to beam
+            if pr[0] > beam_cut_threshold {
+                next_beam.push(SearchPoint {
+                    node: node,
+                    state: state,
+                    label_prob: 0.0,
+                    gap_prob: (label_prob + gap_prob) * pr[0],
+                });
+            }
+
+            for (label, &pr_b) in pr.iter().skip(1).enumerate() {
+                if pr_b < beam_cut_threshold {
+                    continue;
+                }
+
+                let new_node_idx = suffix_tree
+                    .get_child(node, label)
+                    .unwrap_or_else(|| suffix_tree.add_node(node, label, idx));
+
+                next_beam.push(SearchPoint {
+                    node: new_node_idx,
+                    gap_prob: 0.0,
+                    label_prob: (label_prob + gap_prob) * pr_b,
+                    state: (state * n_base) % n_state + (label),
+                });
+            }
+        }
+
+        std::mem::swap(&mut beam, &mut next_beam);
+
+        const DELETE_MARKER: i32 = i32::min_value();
+        beam.sort_by_key(|x| x.node);
+        let mut last_key = DELETE_MARKER;
+        let mut last_key_pos = 0;
+        for i in 0..beam.len() {
+            let beam_item = beam[i];
+            if beam_item.node == last_key {
+                beam[last_key_pos].label_prob += beam_item.label_prob;
+                beam[last_key_pos].gap_prob += beam_item.gap_prob;
+                beam[i].node = DELETE_MARKER;
+            } else {
+                last_key_pos = i;
+                last_key = beam_item.node;
+            }
+        }
+
+        beam.retain(|x| x.node != DELETE_MARKER);
+        let mut has_nans = false;
+        beam.sort_unstable_by(|a, b| {
+            (b.probability())
+                .partial_cmp(&(a.probability()))
+                .unwrap_or_else(|| {
+                    has_nans = true;
+                    std::cmp::Ordering::Equal // don't really care
+                })
+        });
+        if has_nans {
+            return Err(SearchError::IncomparableValues);
+        }
+        beam.truncate(beam_size);
+        if beam.is_empty() {
+            // we've run out of beam (probably the threshold is too high)
+            return Err(SearchError::RanOutOfBeam);
+        }
+        let top = beam[0].probability();
+        for mut x in &mut beam {
+            x.label_prob /= top;
+            x.gap_prob /= top;
+        }
+    }
+
+    let mut path = Vec::new();
+    let mut sequence = String::new();
+
+    if beam[0].node != ROOT_NODE {
+        for (label, &time) in suffix_tree.iter_from(beam[0].node) {
+            path.push(time);
+            sequence.push_str(&alphabet[label + 1]);
+        }
+    }
+
+    path.reverse();
+    Ok((sequence.chars().rev().collect::<String>(), path))
+}
+
 pub fn beam_search<D: Data<Elem = f32>>(
     network_output: &ArrayBase<D, Ix2>,
     alphabet: &[String],
@@ -46,8 +169,9 @@ pub fn beam_search<D: Data<Elem = f32>>(
     let mut suffix_tree = SuffixTree::new(alphabet_size);
     let mut beam = vec![SearchPoint {
         node: ROOT_NODE,
-        label_prob: 0.0,
+        state: 0,
         gap_prob: 1.0,
+        label_prob: 0.0,
     }];
     let mut next_beam = Vec::new();
 
@@ -58,6 +182,7 @@ pub fn beam_search<D: Data<Elem = f32>>(
             node,
             label_prob,
             gap_prob,
+            state,
         } in &beam
         {
             let tip_label = suffix_tree.label(node);
@@ -65,7 +190,8 @@ pub fn beam_search<D: Data<Elem = f32>>(
             // add N to beam
             if pr[0] > beam_cut_threshold {
                 next_beam.push(SearchPoint {
-                    node,
+                    node: node,
+                    state: state,
                     label_prob: 0.0,
                     gap_prob: (label_prob + gap_prob) * pr[0],
                 });
@@ -78,9 +204,10 @@ pub fn beam_search<D: Data<Elem = f32>>(
 
                 if collapse_repeats && Some(label) == tip_label {
                     next_beam.push(SearchPoint {
-                        node,
+                        node: node,
                         label_prob: label_prob * pr_b,
                         gap_prob: 0.0,
+                        state: state,
                     });
                     let new_node_idx = suffix_tree.get_child(node, label).or_else(|| {
                         if gap_prob > 0.0 {
@@ -93,6 +220,7 @@ pub fn beam_search<D: Data<Elem = f32>>(
                     if let Some(idx) = new_node_idx {
                         next_beam.push(SearchPoint {
                             node: idx,
+                            state: state,
                             label_prob: gap_prob * pr_b,
                             gap_prob: 0.0,
                         });
@@ -104,6 +232,7 @@ pub fn beam_search<D: Data<Elem = f32>>(
 
                     next_beam.push(SearchPoint {
                         node: new_node_idx,
+                        state: state,
                         label_prob: (label_prob + gap_prob) * pr_b,
                         gap_prob: 0.0,
                     });
@@ -308,35 +437,35 @@ mod tests {
             [
                 [0f32, 0., 0., 0., 0.],
                 [0f32, 0., 0., 0., 0.],
-                [1f32, 0., 0., 0., 0.], // N
+                [1.00f32, 0., 0., 0., 0.], // N
                 [0f32, 0., 0., 0., 0.],
             ],
             [
                 [0f32, 0., 0., 0., 0.],
                 [0f32, 0., 0., 0., 0.],
-                [0f32, 0., 0.9, 0., 0.], // C
+                [0f32, 0., 0.900, 0., 0.], // C
                 [0f32, 0., 0., 0., 0.],
             ],
             [
                 [0f32, 0., 0., 0., 0.],
-                [0f32, 0., 0., 0., 0.7], // T
+                [0f32, 0., 0., 0., 0.700], // T
                 [0f32, 0., 0., 0., 0.],
                 [0f32, 0., 0., 0., 0.],
-            ],
-            [
-                [0f32, 0., 0., 0., 0.],
-                [0f32, 0., 0., 0., 0.],
-                [0f32, 0., 0., 0., 0.],
-                [1f32, 0., 0., 0., 0.], // N
             ],
             [
                 [0f32, 0., 0., 0., 0.],
                 [0f32, 0., 0., 0., 0.],
                 [0f32, 0., 0., 0., 0.],
-                [0f32, 0.99, 0., 0., 0.], // A
+                [1.00f32, 0., 0., 0., 0.], // N
             ],
             [
-                [0f32, 0.9, 0., 0., 0.], // A
+                [0f32, 0., 0., 0., 0.],
+                [0f32, 0., 0., 0., 0.],
+                [0f32, 0., 0., 0., 0.],
+                [0f32, 0.990, 0., 0., 0.], // A
+            ],
+            [
+                [0f32, 0.900, 0., 0., 0.], // A
                 [0f32, 0., 0., 0., 0.],
                 [0f32, 0., 0., 0., 0.],
                 [0f32, 0., 0., 0., 0.],
@@ -359,6 +488,20 @@ mod tests {
             greedy_crf_search(&network_output, &init, &alphabet, true, 1.0, 0.0).unwrap();
 
         assert_eq!(sequence, "CTAAG+&5+?");
+        assert_eq!(path, vec![1, 2, 4, 5, 6]);
+
+        let beam_size = 5;
+        let beam_cut_threshold = 0.01;
+        let (sequence, _path) = beam_crf_search(
+            &network_output,
+            &init,
+            &alphabet,
+            beam_size,
+            beam_cut_threshold,
+        )
+        .unwrap();
+
+        assert_eq!(sequence, "CTAAG");
         assert_eq!(path, vec![1, 2, 4, 5, 6]);
     }
 
