@@ -7,6 +7,6 @@ build:
 develop:
 	maturin develop
 
-test: develop
+test:
 	cargo test
 	python3 tests/test_decode.py
