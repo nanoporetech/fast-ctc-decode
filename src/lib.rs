@@ -349,6 +349,81 @@ fn beam_search_2d(
     }
 }
 
+#[pyfunction(beam_size = "5", beam_cut_threshold = "0.0", envelope = "None")]
+#[text_signature = "(network_output_1, init_state_1, network_output_2, init_state_2, alphabet, envelope=None, beam_size=5, beam_cut_threshold=0.0)"]
+fn beam_crf_search_2d(
+    network_output_1: &PyArray3<f32>,
+    init_state_1: &PyArray2<f32>,
+    network_output_2: &PyArray3<f32>,
+    init_state_2: &PyArray2<f32>,
+    alphabet: &PySequence,
+    envelope: Option<&PyArray2<usize>>,
+    beam_size: usize,
+    beam_cut_threshold: f32,
+) -> PyResult<String> {
+    let alphabet = seq_to_vec(alphabet)?;
+    let max_beam_cut = 1.0 / (alphabet.len() as f32);
+
+    if network_output_1.shape()[2] != network_output_2.shape()[2] {
+        Err(ValueError::py_err(
+            "inner axes of the network outputs do not match",
+        ))
+    } else if alphabet.len() != network_output_1.shape()[2] {
+        Err(ValueError::py_err(format!(
+            "alphabet size {} does not match probability matrix inner dimension {}",
+            alphabet.len(),
+            network_output_1.shape()[1]
+        )))
+    } else if beam_size == 0 {
+        Err(ValueError::py_err("beam_size cannot be 0"))
+    } else if beam_cut_threshold < -0.0 {
+        Err(ValueError::py_err(
+            "beam_cut_threshold must be at least 0.0",
+        ))
+    } else if beam_cut_threshold >= max_beam_cut {
+        Err(ValueError::py_err(format!(
+            "beam_cut_threshold cannot be more than {}",
+            max_beam_cut
+        )))
+    } else {
+        if let Some(env) = envelope {
+            if env.shape()[0] != network_output_1.shape()[0] {
+                return Err(ValueError::py_err(
+                    "the lengths of network_output_1 and envelope do not match",
+                ));
+            } else if env.shape()[1] != 2 {
+                return Err(ValueError::py_err(
+                    "the inner axis of envelope must have size 2",
+                ));
+            }
+        }
+        // if we need to construct an envelope, this holds it in scope while we're using it
+        let default_envelope;
+        let envelope_view = match envelope {
+            Some(env) => env.as_array(),
+            None => {
+                default_envelope =
+                    Array2::from_shape_fn((network_output_1.shape()[0], 2), |p| match p {
+                        (_, 0) => 0,
+                        (_, _) => network_output_2.shape()[0],
+                    });
+                default_envelope.view()
+            }
+        };
+        search2d::beam_crf_search(
+            &network_output_1.as_array(),
+            &init_state_1.as_array(),
+            &network_output_2.as_array(),
+            &init_state_2.as_array(),
+            &alphabet,
+            &envelope_view,
+            beam_size,
+            beam_cut_threshold,
+        )
+        .map_err(|e| RuntimeError::py_err(format!("{}", e)))
+    }
+}
+
 /// Methods for labelling RNN results using CTC decoding.
 ///
 /// The methods in this module implement the last step of labelling input data. In the case of
@@ -390,6 +465,7 @@ fn beam_search_2d(
 fn fast_ctc_decode(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(beam_search))?;
     m.add_wrapped(wrap_pyfunction!(beam_search_2d))?;
+    m.add_wrapped(wrap_pyfunction!(beam_crf_search_2d))?;
     m.add_wrapped(wrap_pyfunction!(viterbi_search))?;
     m.add_wrapped(wrap_pyfunction!(greedy_crf_search))?;
     m.add_wrapped(wrap_pyfunction!(beam_crf_search))?;
