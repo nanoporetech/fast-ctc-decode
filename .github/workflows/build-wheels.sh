@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e -x
 
-for PYBIN in /opt/python/cp3[5678]*/bin; do
+for PYBIN in /opt/python/cp3[56789]*/bin; do
     "${PYBIN}/pip" install maturin
     "${PYBIN}/maturin" build -i "${PYBIN}/python" --release
 done

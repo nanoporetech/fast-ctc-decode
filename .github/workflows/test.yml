@@ -19,7 +19,7 @@ jobs:
         run: cargo test
       - uses: actions/setup-python@v2
         with:
-          python-version: '3.7'
+          python-version: '3.9'
       - name: Python unit tests
         run: |
           python3 -m venv venv3
@@ -40,7 +40,7 @@ jobs:
         run: cargo test
       - uses: actions/setup-python@v2
         with:
-          python-version: '3.7'
+          python-version: '3.9'
       - name: Python unit tests
         run: |
           python -m venv venv3
