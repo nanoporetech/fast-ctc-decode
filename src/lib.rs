@@ -12,7 +12,7 @@ use numpy::PyArray1;
 use numpy::PyArray2;
 use numpy::PyArray3;
 
-use pyo3::exceptions::{RuntimeError, ValueError};
+use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PySequence;
 use pyo3::wrap_pyfunction;
@@ -74,7 +74,7 @@ fn seq_to_vec(seq: &PySequence) -> PyResult<Vec<String>> {
 ///         timepoints of each label (as indices into the outer axis of `network_output`).
 ///
 /// Raises:
-///     ValueError: The constraints on the arguments have not been met.
+///     PyValueError: The constraints on the arguments have not been met.
 #[pyfunction(
     qstring = false,
     qscale = "1.0",
@@ -83,6 +83,7 @@ fn seq_to_vec(seq: &PySequence) -> PyResult<Vec<String>> {
 )]
 #[text_signature = "(network_output, alphabet, qstring=False, qscale=1.0, qbias=0.0, collapse_repeats=True)"]
 fn viterbi_search(
+    py: Python,
     network_output: &PyArray2<f32>,
     alphabet: &PySequence,
     qstring: bool,
@@ -92,27 +93,33 @@ fn viterbi_search(
 ) -> PyResult<(String, Vec<usize>)> {
     let alphabet = seq_to_vec(alphabet)?;
     if alphabet.is_empty() {
-        Err(ValueError::py_err("Empty alphabet given"))
+        Err(PyValueError::new_err("Empty alphabet given"))
     } else if alphabet.len() != network_output.shape()[1] {
-        Err(ValueError::py_err(
+        Err(PyValueError::new_err(
             "alphabet size does not match probability matrix dimensions",
         ))
     } else {
-        search::viterbi_search(
-            &network_output.as_array(),
-            &alphabet,
-            qstring,
-            qscale,
-            qbias,
-            collapse_repeats,
-        )
-        .map_err(|e| RuntimeError::py_err(format!("{}", e)))
+        unsafe {
+            let network_output = network_output.as_array();
+            py.allow_threads(|| {
+                search::viterbi_search(
+                    &network_output,
+                    &alphabet,
+                    qstring,
+                    qscale,
+                    qbias,
+                    collapse_repeats,
+                )
+            })
+        }
+        .map_err(|e| PyRuntimeError::new_err(format!("{}", e)))
     }
 }
 
 #[pyfunction(qstring = false, qscale = "1.0", qbias = "0.0")]
 #[text_signature = "(network_output, init_state, alphabet)"]
 fn greedy_crf_search(
+    py: Python,
     network_output: &PyArray3<f32>,
     init_state: &PyArray1<f32>,
     alphabet: &PySequence,
@@ -122,27 +129,34 @@ fn greedy_crf_search(
 ) -> PyResult<(String, Vec<usize>)> {
     let alphabet = seq_to_vec(alphabet)?;
     if alphabet.is_empty() {
-        Err(ValueError::py_err("Empty alphabet given"))
+        Err(PyValueError::new_err("Empty alphabet given"))
     } else if network_output.shape()[2] != alphabet.len() {
-        Err(ValueError::py_err(
+        Err(PyValueError::new_err(
             "alphabet size does not match probability matrix dimensions",
         ))
     } else {
-        search::greedy_crf_search(
-            &network_output.as_array(),
-            &init_state.as_array(),
-            &alphabet,
-            qstring,
-            qscale,
-            qbias,
-        )
-        .map_err(|e| RuntimeError::py_err(format!("{}", e)))
+        unsafe {
+            let network_output = network_output.as_array();
+            let init_state = init_state.as_array();
+            py.allow_threads(|| {
+                search::greedy_crf_search(
+                    &network_output,
+                    &init_state,
+                    &alphabet,
+                    qstring,
+                    qscale,
+                    qbias,
+                )
+            })
+        }
+        .map_err(|e| PyRuntimeError::new_err(format!("{}", e)))
     }
 }
 
 #[pyfunction(beam_size = "5", beam_cut_threshold = "0.0")]
 #[text_signature = "(network_output, init_state, alphabet, beam_size, beam_cut_threshold)"]
 fn beam_crf_search(
+    py: Python,
     network_output: &PyArray3<f32>,
     init_state: &PyArray1<f32>,
     alphabet: &PySequence,
@@ -151,20 +165,26 @@ fn beam_crf_search(
 ) -> PyResult<(String, Vec<usize>)> {
     let alphabet = seq_to_vec(alphabet)?;
     if alphabet.is_empty() {
-        Err(ValueError::py_err("Empty alphabet given"))
+        Err(PyValueError::new_err("Empty alphabet given"))
     } else if network_output.shape()[2] != alphabet.len() {
-        Err(ValueError::py_err(
+        Err(PyValueError::new_err(
             "alphabet size does not match probability matrix dimensions",
         ))
     } else {
-        search::beam_crf_search(
-            &network_output.as_array(),
-            &init_state.as_array(),
-            &alphabet,
-            beam_size,
-            beam_cut_threshold,
-        )
-        .map_err(|e| RuntimeError::py_err(format!("{}", e)))
+        unsafe {
+            let network_output = network_output.as_array();
+            let init_state = init_state.as_array();
+            py.allow_threads(|| {
+                search::beam_crf_search(
+                    &network_output,
+                    &init_state,
+                    &alphabet,
+                    beam_size,
+                    beam_cut_threshold,
+                )
+            })
+        }
+        .map_err(|e| PyRuntimeError::new_err(format!("{}", e)))
     }
 }
 
@@ -197,10 +217,11 @@ fn beam_crf_search(
 ///         timepoints of each label (as indices into the outer axis of `network_output`).
 ///
 /// Raises:
-///     ValueError: The constraints on the arguments have not been met.
+///     PyValueError: The constraints on the arguments have not been met.
 #[pyfunction(beam_size = "5", beam_cut_threshold = "0.0", collapse_repeats = true)]
 #[text_signature = "(network_output, alphabet, beam_size=5, beam_cut_threshold=0.0, collapse_repeats=True)"]
 fn beam_search(
+    py: Python,
     network_output: &PyArray2<f32>,
     alphabet: &PySequence,
     beam_size: usize,
@@ -210,31 +231,36 @@ fn beam_search(
     let alphabet = seq_to_vec(alphabet)?;
     let max_beam_cut = 1.0 / (alphabet.len() as f32);
     if alphabet.len() != network_output.shape()[1] {
-        Err(ValueError::py_err(format!(
+        Err(PyValueError::new_err(format!(
             "alphabet size {} does not match probability matrix inner dimension {}",
             alphabet.len(),
             network_output.shape()[1]
         )))
     } else if beam_size == 0 {
-        Err(ValueError::py_err("beam_size cannot be 0"))
+        Err(PyValueError::new_err("beam_size cannot be 0"))
     } else if beam_cut_threshold < -0.0 {
-        Err(ValueError::py_err(
+        Err(PyValueError::new_err(
             "beam_cut_threshold must be at least 0.0",
         ))
     } else if beam_cut_threshold >= max_beam_cut {
-        Err(ValueError::py_err(format!(
+        Err(PyValueError::new_err(format!(
             "beam_cut_threshold cannot be more than {}",
             max_beam_cut
         )))
     } else {
-        search::beam_search(
-            &network_output.as_array(),
-            &alphabet,
-            beam_size,
-            beam_cut_threshold,
-            collapse_repeats,
-        )
-        .map_err(|e| RuntimeError::py_err(format!("{}", e)))
+        unsafe {
+            let network_output = network_output.as_array();
+            py.allow_threads(|| {
+                search::beam_search(
+                    &network_output,
+                    &alphabet,
+                    beam_size,
+                    beam_cut_threshold,
+                    collapse_repeats,
+                )
+            })
+        }
+        .map_err(|e| PyRuntimeError::new_err(format!("{}", e)))
     }
 }
 
@@ -271,7 +297,7 @@ fn beam_search(
 ///     str: The decoded sequence.
 ///
 /// Raises:
-///     ValueError: The constraints on the arguments have not been met.
+///     PyValueError: The constraints on the arguments have not been met.
 #[pyfunction(
     beam_size = "5",
     beam_cut_threshold = "0.0",
@@ -280,6 +306,7 @@ fn beam_search(
 )]
 #[text_signature = "(network_output_1, network_output_2, alphabet, envelope=None, beam_size=5, beam_cut_threshold=0.0, collapse_repeats=True)"]
 fn beam_search_2d(
+    py: Python,
     network_output_1: &PyArray2<f32>,
     network_output_2: &PyArray2<f32>,
     alphabet: &PySequence,
@@ -291,67 +318,76 @@ fn beam_search_2d(
     let alphabet = seq_to_vec(alphabet)?;
     let max_beam_cut = 1.0 / (alphabet.len() as f32);
     if network_output_1.shape()[1] != network_output_2.shape()[1] {
-        Err(ValueError::py_err(
+        Err(PyValueError::new_err(
             "inner axes of the network outputs do not match",
         ))
     } else if alphabet.len() != network_output_1.shape()[1] {
-        Err(ValueError::py_err(format!(
+        Err(PyValueError::new_err(format!(
             "alphabet size {} does not match probability matrix inner dimension {}",
             alphabet.len(),
             network_output_1.shape()[1]
         )))
     } else if beam_size == 0 {
-        Err(ValueError::py_err("beam_size cannot be 0"))
+        Err(PyValueError::new_err("beam_size cannot be 0"))
     } else if beam_cut_threshold < -0.0 {
-        Err(ValueError::py_err(
+        Err(PyValueError::new_err(
             "beam_cut_threshold must be at least 0.0",
         ))
     } else if beam_cut_threshold >= max_beam_cut {
-        Err(ValueError::py_err(format!(
+        Err(PyValueError::new_err(format!(
             "beam_cut_threshold cannot be more than {}",
             max_beam_cut
         )))
     } else {
         if let Some(env) = envelope {
             if env.shape()[0] != network_output_1.shape()[0] {
-                return Err(ValueError::py_err(
+                return Err(PyValueError::new_err(
                     "the lengths of network_output_1 and envelope do not match",
                 ));
             } else if env.shape()[1] != 2 {
-                return Err(ValueError::py_err(
+                return Err(PyValueError::new_err(
                     "the inner axis of envelope must have size 2",
                 ));
             }
         }
         // if we need to construct an envelope, this holds it in scope while we're using it
         let default_envelope;
-        let envelope_view = match envelope {
-            Some(env) => env.as_array(),
-            None => {
-                default_envelope =
-                    Array2::from_shape_fn((network_output_1.shape()[0], 2), |p| match p {
-                        (_, 0) => 0,
-                        (_, _) => network_output_2.shape()[0],
-                    });
-                default_envelope.view()
-            }
-        };
-        search2d::beam_search(
-            &network_output_1.as_array(),
-            &network_output_2.as_array(),
-            &alphabet,
-            &envelope_view,
-            beam_size,
-            beam_cut_threshold,
-            collapse_repeats,
-        )
-        .map_err(|e| RuntimeError::py_err(format!("{}", e)))
+        unsafe {
+            let envelope_view = match envelope {
+                Some(env) => env.as_array(),
+                None => {
+                    default_envelope =
+                        Array2::from_shape_fn((network_output_1.shape()[0], 2), |p| match p {
+                            (_, 0) => 0,
+                            (_, _) => network_output_2.shape()[0],
+                        });
+                    default_envelope.view()
+                }
+            };
+
+            let network_output_1 = network_output_1.as_array();
+            let network_output_2 = network_output_2.as_array();
+
+            py.allow_threads(|| {
+                search2d::beam_search(
+                    &network_output_1,
+                    &network_output_2,
+                    &alphabet,
+                    &envelope_view,
+                    beam_size,
+                    beam_cut_threshold,
+                    collapse_repeats,
+                )
+            })
+        }
+        .map_err(|e| PyRuntimeError::new_err(format!("{}", e)))
     }
 }
 
 #[pyfunction(beam_size = "5", beam_cut_threshold = "0.0", envelope = "None")]
 #[text_signature = "(network_output_1, init_state_1, network_output_2, init_state_2, alphabet, envelope=None, beam_size=5, beam_cut_threshold=0.0)"]
 fn beam_crf_search_2d(
+    py: Python,
     network_output_1: &PyArray3<f32>,
     init_state_1: &PyArray2<f32>,
     network_output_2: &PyArray3<f32>,
@@ -365,62 +401,73 @@ fn beam_crf_search_2d(
     let max_beam_cut = 1.0 / (alphabet.len() as f32);
 
     if network_output_1.shape()[2] != network_output_2.shape()[2] {
-        Err(ValueError::py_err(
+        Err(PyValueError::new_err(
             "inner axes of the network outputs do not match",
         ))
     } else if alphabet.len() != network_output_1.shape()[2] {
-        Err(ValueError::py_err(format!(
+        Err(PyValueError::new_err(format!(
             "alphabet size {} does not match probability matrix inner dimension {}",
             alphabet.len(),
             network_output_1.shape()[1]
         )))
     } else if beam_size == 0 {
-        Err(ValueError::py_err("beam_size cannot be 0"))
+        Err(PyValueError::new_err("beam_size cannot be 0"))
     } else if beam_cut_threshold < -0.0 {
-        Err(ValueError::py_err(
+        Err(PyValueError::new_err(
             "beam_cut_threshold must be at least 0.0",
         ))
     } else if beam_cut_threshold >= max_beam_cut {
-        Err(ValueError::py_err(format!(
+        Err(PyValueError::new_err(format!(
             "beam_cut_threshold cannot be more than {}",
             max_beam_cut
         )))
     } else {
         if let Some(env) = envelope {
             if env.shape()[0] != network_output_1.shape()[0] {
-                return Err(ValueError::py_err(
+                return Err(PyValueError::new_err(
                     "the lengths of network_output_1 and envelope do not match",
                 ));
             } else if env.shape()[1] != 2 {
-                return Err(ValueError::py_err(
+                return Err(PyValueError::new_err(
                     "the inner axis of envelope must have size 2",
                 ));
             }
         }
         // if we need to construct an envelope, this holds it in scope while we're using it
         let default_envelope;
-        let envelope_view = match envelope {
-            Some(env) => env.as_array(),
-            None => {
-                default_envelope =
-                    Array2::from_shape_fn((network_output_1.shape()[0], 2), |p| match p {
-                        (_, 0) => 0,
-                        (_, _) => network_output_2.shape()[0],
-                    });
-                default_envelope.view()
-            }
-        };
-        search2d::beam_crf_search(
-            &network_output_1.as_array(),
-            &init_state_1.as_array(),
-            &network_output_2.as_array(),
-            &init_state_2.as_array(),
-            &alphabet,
-            &envelope_view,
-            beam_size,
-            beam_cut_threshold,
-        )
-        .map_err(|e| RuntimeError::py_err(format!("{}", e)))
+
+        unsafe {
+            let envelope_view = match envelope {
+                Some(env) => env.as_array(),
+                None => {
+                    default_envelope =
+                        Array2::from_shape_fn((network_output_1.shape()[0], 2), |p| match p {
+                            (_, 0) => 0,
+                            (_, _) => network_output_2.shape()[0],
+                        });
+                    default_envelope.view()
+                }
+            };
+
+            let network_output_1 = network_output_1.as_array();
+            let init_state_1 = init_state_1.as_array();
+            let network_output_2 = network_output_2.as_array();
+            let init_state_2 = init_state_2.as_array();
+
+            py.allow_threads(|| {
+                search2d::beam_crf_search(
+                    &network_output_1,
+                    &init_state_1,
+                    &network_output_2,
+                    &init_state_2,
+                    &alphabet,
+                    &envelope_view,
+                    beam_size,
+                    beam_cut_threshold,
+                )
+            })
+        }
+        .map_err(|e| PyRuntimeError::new_err(format!("{}", e)))
     }
 }
 
