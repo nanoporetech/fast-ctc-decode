@@ -389,9 +389,9 @@ fn beam_search_2d(
 fn beam_crf_search_2d(
     py: Python,
     network_output_1: &PyArray3<f32>,
-    init_state_1: &PyArray2<f32>,
+    init_state_1: &PyArray1<f32>,
     network_output_2: &PyArray3<f32>,
-    init_state_2: &PyArray2<f32>,
+    init_state_2: &PyArray1<f32>,
     alphabet: &PySequence,
     envelope: Option<&PyArray2<usize>>,
     beam_size: usize,
