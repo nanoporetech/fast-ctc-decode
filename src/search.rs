@@ -35,7 +35,7 @@ pub fn phred(prob: f32, qscale: f32, qbias: f32) -> char {
     std::char::from_u32(q.round() as u32 + 33).unwrap()
 }
 
-pub fn beam_crf_search<D: Data<Elem = f32>>(
+pub fn crf_beam_search<D: Data<Elem = f32>>(
     network_output: &ArrayBase<D, Ix3>,
     init_state: &ArrayBase<D, Ix1>,
     alphabet: &[String],
@@ -59,7 +59,7 @@ pub fn beam_crf_search<D: Data<Elem = f32>>(
     }];
     let mut next_beam = Vec::new();
 
-    for (idx, pp) in network_output.axis_iter(Axis(0)).enumerate() {
+    for (idx, probs) in network_output.axis_iter(Axis(0)).enumerate() {
         next_beam.clear();
 
         for &SearchPoint {
@@ -69,7 +69,7 @@ pub fn beam_crf_search<D: Data<Elem = f32>>(
             gap_prob,
         } in &beam
         {
-            let pr = pp.slice(s![state, ..]);
+            let pr = probs.slice(s![state, ..]);
 
             // add N to beam
             if pr[0] > beam_cut_threshold {
@@ -378,7 +378,7 @@ pub fn viterbi_search<D: Data<Elem = f32>>(
     Ok((sequence, path))
 }
 
-pub fn greedy_crf_search<D: Data<Elem = f32>>(
+pub fn crf_greedy_search<D: Data<Elem = f32>>(
     network_output: &ArrayBase<D, Ix3>,
     init_state: &ArrayBase<D, Ix1>,
     alphabet: &[String],
@@ -424,7 +424,7 @@ mod tests {
     use test::Bencher;
 
     #[test]
-    fn test_greedy_crf() {
+    fn crf_test_greedy() {
         let alphabet = vec![
             String::from("N"),
             String::from("A"),
@@ -479,20 +479,20 @@ mod tests {
         ];
         let init = array![0f32, 0., 1., 0., 0.];
         let (sequence, path) =
-            greedy_crf_search(&network_output, &init, &alphabet, false, 1.0, 0.0).unwrap();
+            crf_greedy_search(&network_output, &init, &alphabet, false, 1.0, 0.0).unwrap();
 
         assert_eq!(sequence, "CTAAG");
         assert_eq!(path, vec![1, 2, 4, 5, 6]);
 
         let (sequence, path) =
-            greedy_crf_search(&network_output, &init, &alphabet, true, 1.0, 0.0).unwrap();
+            crf_greedy_search(&network_output, &init, &alphabet, true, 1.0, 0.0).unwrap();
 
         assert_eq!(sequence, "CTAAG+&5+?");
         assert_eq!(path, vec![1, 2, 4, 5, 6]);
 
         let beam_size = 5;
         let beam_cut_threshold = 0.01;
-        let (sequence, path) = beam_crf_search(
+        let (sequence, path) = crf_beam_search(
             &network_output,
             &init,
             &alphabet,

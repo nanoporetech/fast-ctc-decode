@@ -118,7 +118,7 @@ fn viterbi_search(
 
 #[pyfunction(qstring = false, qscale = "1.0", qbias = "0.0")]
 #[text_signature = "(network_output, init_state, alphabet)"]
-fn greedy_crf_search(
+fn crf_greedy_search(
     py: Python,
     network_output: &PyArray3<f32>,
     init_state: &PyArray1<f32>,
@@ -139,7 +139,7 @@ fn greedy_crf_search(
             let network_output = network_output.as_array();
             let init_state = init_state.as_array();
             py.allow_threads(|| {
-                search::greedy_crf_search(
+                search::crf_greedy_search(
                     &network_output,
                     &init_state,
                     &alphabet,
@@ -155,7 +155,7 @@ fn greedy_crf_search(
 
 #[pyfunction(beam_size = "5", beam_cut_threshold = "0.0")]
 #[text_signature = "(network_output, init_state, alphabet, beam_size, beam_cut_threshold)"]
-fn beam_crf_search(
+fn crf_beam_search(
     py: Python,
     network_output: &PyArray3<f32>,
     init_state: &PyArray1<f32>,
@@ -175,7 +175,7 @@ fn beam_crf_search(
             let network_output = network_output.as_array();
             let init_state = init_state.as_array();
             py.allow_threads(|| {
-                search::beam_crf_search(
+                search::crf_beam_search(
                     &network_output,
                     &init_state,
                     &alphabet,
@@ -386,7 +386,7 @@ fn beam_search_2d(
 
 #[pyfunction(beam_size = "5", beam_cut_threshold = "0.0", envelope = "None")]
 #[text_signature = "(network_output_1, init_state_1, network_output_2, init_state_2, alphabet, envelope=None, beam_size=5, beam_cut_threshold=0.0)"]
-fn beam_crf_search_2d(
+fn crf_beam_search_2d(
     py: Python,
     network_output_1: &PyArray3<f32>,
     init_state_1: &PyArray1<f32>,
@@ -455,7 +455,7 @@ fn beam_crf_search_2d(
             let init_state_2 = init_state_2.as_array();
 
             py.allow_threads(|| {
-                search2d::beam_crf_search(
+                search2d::crf_beam_search(
                     &network_output_1,
                     &init_state_1,
                     &network_output_2,
@@ -512,10 +512,10 @@ fn beam_crf_search_2d(
 fn fast_ctc_decode(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(beam_search))?;
     m.add_wrapped(wrap_pyfunction!(beam_search_2d))?;
-    m.add_wrapped(wrap_pyfunction!(beam_crf_search_2d))?;
     m.add_wrapped(wrap_pyfunction!(viterbi_search))?;
-    m.add_wrapped(wrap_pyfunction!(greedy_crf_search))?;
-    m.add_wrapped(wrap_pyfunction!(beam_crf_search))?;
+    m.add_wrapped(wrap_pyfunction!(crf_greedy_search))?;
+    m.add_wrapped(wrap_pyfunction!(crf_beam_search))?;
+    m.add_wrapped(wrap_pyfunction!(crf_beam_search_2d))?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     Ok(())
 }
