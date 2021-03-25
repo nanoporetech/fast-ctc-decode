@@ -410,7 +410,7 @@ fn root_probs<D: Data<Elem = LogSpace>>(
 
 fn root_crf_probs<D: Data<Elem = LogSpace>>(
     gap_probs: &ArrayBase<D, Ix3>,
-    back_guides: &ArrayBase<D, Ix2>,
+    init_state: usize,
     upper_bound: usize,
 ) -> SecondaryProbs {
     let mut probs = SecondaryProbs {
@@ -418,19 +418,23 @@ fn root_crf_probs<D: Data<Elem = LogSpace>>(
         probs: Vec::new(),
         max_prob: LogSpace::one(),
     };
+
+    let n_state = gap_probs.shape()[1];
+    let n_base = gap_probs.shape()[2] - 1;
+
     probs.probs.reserve(upper_bound + 1);
 
     let mut cur_prob = LogSpace::one();
     probs.probs.push(ProbPair::with_gap(cur_prob));
 
-    for (idx, pr) in gap_probs
+    let mut state = init_state;
+    for pr in gap_probs
         .slice(s![0..upper_bound, .., ..])
         .axis_iter(Axis(0))
-        .enumerate()
     {
-        let state = back_guides.slice(s![idx + 1, ..]).argmax().unwrap();
         cur_prob *= pr[[state as usize, 0]];
         probs.probs.push(ProbPair::with_gap(cur_prob));
+        state = (state * n_base) % n_state;
     }
 
     probs
@@ -644,9 +648,9 @@ pub fn beam_search<D: Data<Elem = f32>, E: Data<Elem = usize>>(
 
 pub fn beam_crf_search<D: Data<Elem = f32>, E: Data<Elem = usize>>(
     network_output_1_real: &ArrayBase<D, Ix3>,
-    init_state_1: &ArrayBase<D, Ix2>,
+    init_state_1: &ArrayBase<D, Ix1>,
     network_output_2_real: &ArrayBase<D, Ix3>,
-    init_state_2: &ArrayBase<D, Ix2>,
+    init_state_2: &ArrayBase<D, Ix1>,
     alphabet: &[String],
     envelope: &ArrayBase<E, Ix2>,
     beam_size: usize,
@@ -669,7 +673,7 @@ pub fn beam_crf_search<D: Data<Elem = f32>, E: Data<Elem = usize>>(
     let mut suffix_tree = SuffixTree::new(n_base);
     let mut beam = vec![SearchPoint {
         node: ROOT_NODE,
-        state: init_state_1.slice(s![0, ..]).argmax().unwrap(),
+        state: init_state_1.argmax().unwrap(),
         prob_1: ProbPair {
             label: LogSpace::zero(),
             gap: LogSpace::one(),
@@ -681,7 +685,7 @@ pub fn beam_crf_search<D: Data<Elem = f32>, E: Data<Elem = usize>>(
 
     let root_secondary_probs = root_crf_probs(
         &network_output_2.view(),
-        &init_state_2.map(|&x| LogSpace::new(x)).view(),
+        init_state_2.argmax().unwrap(),
         envelope[(0, 1)],
     );
 
