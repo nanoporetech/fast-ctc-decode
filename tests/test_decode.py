@@ -355,7 +355,7 @@ class TestViterbiSearch(TestCase):
         self.assertEqual(seq, "B")
 
 
-class Test2DBeamSearch(TestCase):
+class TestDuplexBeamSearch(TestCase):
     def setUp(self):
         self.beam_size = 5
         self.alphabet = "NACGT"
@@ -368,13 +368,13 @@ class Test2DBeamSearch(TestCase):
         return x / np.linalg.norm(x, ord=2, axis=1, keepdims=True)
 
     def test_nans(self):
-        """beam_search_2d is passed NaN values"""
+        """beam_search_duplex is passed NaN values"""
         self.probs_1.fill(np.NaN)
         with self.assertRaisesRegex(RuntimeError, "Failed to compare values"):
-            beam_search_2d(self.probs_1, self.probs_2, self.alphabet)
+            beam_search_duplex(self.probs_1, self.probs_2, self.alphabet)
 
     def test_identical_data(self):
-        """Test 2D beam search on the same data twice"""
+        """Test duplex beam search on the same data twice"""
         x = np.array([
             [0.01, 0.98, 0.01],
             [0.01, 0.98, 0.01],
@@ -391,11 +391,11 @@ class Test2DBeamSearch(TestCase):
             [0.01, 0.01, 0.98],
             [0.01, 0.01, 0.98],
         ], np.float32)
-        seq = beam_search_2d(x, x, "NAB")
+        seq = beam_search_duplex(x, x, "NAB")
         self.assertEqual("AAB", seq)
 
     def test_disagreeing_data(self):
-        """Test 2D beam search on data that disagrees"""
+        """Test duplex beam search on data that disagrees"""
         x = np.array([
             [0.01, 0.98, 0.01],
             [0.01, 0.34, 0.65],
@@ -409,7 +409,7 @@ class Test2DBeamSearch(TestCase):
             [0.0, 1.0, 0.0],
             [0.0, 0.0, 1.0],
         ], np.float32)
-        self.assertEqual("AB", beam_search_2d(x, y, "NAB"))
+        self.assertEqual("AB", beam_search_duplex(x, y, "NAB"))
 
 
 if __name__ == '__main__':
