@@ -248,7 +248,7 @@ fn build_secondary_probs<D: Data<Elem = LogSpace>>(
     probs
 }
 
-fn build_secondary_crf_probs<D: Data<Elem = LogSpace>>(
+fn crf_build_secondary_probs<D: Data<Elem = LogSpace>>(
     network_output: &ArrayBase<D, Ix3>,
     parent_probs: &SecondaryProbs,
     label: usize,
@@ -287,7 +287,7 @@ fn build_secondary_crf_probs<D: Data<Elem = LogSpace>>(
     probs
 }
 
-fn extend_secondary_crf_probs<D: Data<Elem = LogSpace>>(
+fn crf_extend_secondary_probs<D: Data<Elem = LogSpace>>(
     p2: &ArrayBase<D, Ix3>,
     probs: &mut SecondaryProbs,
     parent_probs: &SecondaryProbs,
@@ -408,7 +408,7 @@ fn root_probs<D: Data<Elem = LogSpace>>(
     probs
 }
 
-fn root_crf_probs<D: Data<Elem = LogSpace>>(
+fn crf_root_probs<D: Data<Elem = LogSpace>>(
     gap_probs: &ArrayBase<D, Ix3>,
     init_state: usize,
     upper_bound: usize,
@@ -646,7 +646,7 @@ pub fn beam_search<D: Data<Elem = f32>, E: Data<Elem = usize>>(
     Ok(sequence.chars().rev().collect())
 }
 
-pub fn beam_crf_search<D: Data<Elem = f32>, E: Data<Elem = usize>>(
+pub fn crf_beam_search<D: Data<Elem = f32>, E: Data<Elem = usize>>(
     network_output_1_real: &ArrayBase<D, Ix3>,
     init_state_1: &ArrayBase<D, Ix1>,
     network_output_2_real: &ArrayBase<D, Ix3>,
@@ -683,7 +683,7 @@ pub fn beam_crf_search<D: Data<Elem = f32>, E: Data<Elem = usize>>(
 
     let mut next_beam = Vec::new();
 
-    let root_secondary_probs = root_crf_probs(
+    let root_secondary_probs = crf_root_probs(
         &network_output_2.view(),
         init_state_2.argmax().unwrap(),
         envelope[(0, 1)],
@@ -692,7 +692,7 @@ pub fn beam_crf_search<D: Data<Elem = f32>, E: Data<Elem = usize>>(
     let network_2_len = network_output_2.shape()[0];
     let mut last_upper_bound = 0;
 
-    for (pp, bounds) in network_output_1.outer_iter().zip(envelope.outer_iter()) {
+    for (probs, bounds) in network_output_1.outer_iter().zip(envelope.outer_iter()) {
         next_beam.clear();
 
         let (lower_t, upper_t) = (bounds[0].max(0), bounds[1].min(network_2_len));
@@ -715,7 +715,7 @@ pub fn beam_crf_search<D: Data<Elem = f32>, E: Data<Elem = usize>>(
                     }
 
                     if has_data {
-                        extend_secondary_crf_probs(
+                        crf_extend_secondary_probs(
                             &network_output_2,
                             &mut placeholder,
                             suffix_tree
@@ -738,7 +738,7 @@ pub fn beam_crf_search<D: Data<Elem = f32>, E: Data<Elem = usize>>(
         last_upper_bound = upper_t;
 
         for &tip in &beam {
-            let labelling_probs = pp.slice(s![tip.state, ..]);
+            let labelling_probs = probs.slice(s![tip.state, ..]);
 
             // add N to beam
             if labelling_probs[0] > beam_cut_threshold {
@@ -754,7 +754,7 @@ pub fn beam_crf_search<D: Data<Elem = f32>, E: Data<Elem = usize>>(
                 }
 
                 let new_node_idx = suffix_tree.get_child(tip.node, label).unwrap_or_else(|| {
-                    let secondary_probs = build_secondary_crf_probs(
+                    let secondary_probs = crf_build_secondary_probs(
                         &network_output_2,
                         suffix_tree
                             .get_data_ref(tip.node)
