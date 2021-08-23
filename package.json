@@ -1,0 +1,48 @@
+{
+  "name": "fast-ctc",
+  "version": "1.0.0",
+  "description": "Fast CTC Decode for the browser via WASM",
+  "main": "pkg/fast_ctc_decode_wasm.js",
+  "scripts": {
+    "prepare": "node post-install.js",
+    "install": "npm run build",
+    "build": "wasm-pack build --target web --debug && npm run prepare",
+    "serve": "serve -s pkg",
+    "test": "jest --watch --runInBand --detectOpenHandles"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nanoporetech/fast-ctc-decode.git"
+  },
+  "author": "Jabari Holder",
+  "homepage": "https://github.com/nanoporetech/fast-ctc-decode#readme",
+  "devDependencies": {
+    "@babel/plugin-syntax-dynamic-import": "^7.8.3",
+    "@babel/plugin-transform-runtime": "^7.14.5",
+    "@babel/preset-env": "^7.14.8",
+    "babel-jest": "^27.0.6",
+    "babel-plugin-transform-import-meta": "^2.0.0",
+    "jest": "^27.0.6",
+    "jest-fetch-mock": "^3.0.3",
+    "jest-puppeteer": "^5.0.4",
+    "puppeteer": "^10.1.0",
+    "serve": "^12.0.0"
+  },
+  "jest": {
+    "verbose": true,
+    "resetMocks": false,
+    "preset": "jest-puppeteer",
+    "collectCoverageFrom": [
+      "test/**/*.{js}",
+      "!node_modules/"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 80,
+        "functions": 80,
+        "lines": 80,
+        "statements": -15
+      }
+    }
+  }
+}
