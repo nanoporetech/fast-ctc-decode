@@ -6,3 +6,5 @@ dist/
 *.so
 target/
 .*.swp
+pkg/
+node_modules/
