@@ -1,7 +1,7 @@
 {
   "name": "fast-ctc",
   "version": "1.0.0",
-  "description": "Fast CTC Decode for the browser via WASM",
+  "description": "Fast CTC Decode via WASM",
   "main": "pkg/fast_ctc_decode_wasm.js",
   "scripts": {
     "prepare": "node post-install.js",
