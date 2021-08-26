@@ -10,7 +10,7 @@ extern crate serde_json;
 extern crate wasm_bindgen;
 
 use wasm_bindgen::prelude::*;
-use ndarray::{ArrayView, Ix2 };
+use ndarray::{ArrayView };
 use std::fmt;
 use js_sys::Error;
 use serde_json::json;
@@ -489,15 +489,14 @@ pub fn js_beam_search(
     beam_size: usize,
     beam_cut_threshold: f32,
     collapse_repeats: bool,
+    shape: &JsValue,
 )-> Result<JsValue, JsValue> {
+    let shape: Vec<usize> = shape.into_serde().unwrap();
     let alphabet: Vec<String> = alphabet.into_serde().unwrap();
     let max_beam_cut = 1.0 / (alphabet.len() as f32);
-    let network_output: Vec<Vec<f32>> = network_output.into_serde().unwrap();
-    let flat_network_output: Vec<f32> = network_output.iter().flatten().cloned().collect();
-    let network_view = ArrayView::from(&network_output);
-    let shape = (network_view.shape()[0], network_view[0].len());
-    let network_output: ArrayView<f32, Ix2> = ArrayView::from_shape(shape, &flat_network_output).unwrap();
-    
+    let network_output: Vec<f32> = network_output.into_serde().unwrap();
+    let network_output = ArrayView::from_shape((shape[0], shape[1]), &network_output).unwrap();
+
     if beam_size == 0 {
         Error::new("beam_size cannot be 0");
         return Ok(JsValue::from_str("Error"));
@@ -529,15 +528,14 @@ pub fn js_viterbi_search(
     qscale: f32,
     qbias: f32,
     collapse_repeats: bool,
+    shape: &JsValue,
 )-> Result<JsValue, JsValue> {
+    let shape: Vec<usize> = shape.into_serde().unwrap();
     let alphabet: Vec<String> = alphabet.into_serde().unwrap();
     let max_beam_cut = 1.0 / (alphabet.len() as f32);
-    let network_output: Vec<Vec<f32>> = network_output.into_serde().unwrap();
-    let flat_network_output: Vec<f32> = network_output.iter().flatten().cloned().collect();
-    let network_view = ArrayView::from(&network_output);
-    let shape = (network_view.shape()[0], network_view[0].len());
-    let network_output: ArrayView<f32, Ix2> = ArrayView::from_shape(shape, &flat_network_output).unwrap();
-    
+    let network_output: Vec<f32> = network_output.into_serde().unwrap();
+    let network_output = ArrayView::from_shape((shape[0], shape[1]), &network_output).unwrap();
+
     if alphabet.is_empty() {
         Error::new("Empty alphabet given");
         return Ok(JsValue::from_str("Error"));
@@ -558,7 +556,6 @@ pub fn js_viterbi_search(
         return Ok(JsValue::from_str(&beam));
     }
 }
-
 
 /// Methods for labelling RNN results using CTC decoding.
 ///
