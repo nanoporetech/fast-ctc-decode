@@ -38,11 +38,18 @@ $ pip install fast-ctc-decode
 
 ## Developer Quickstart
 
+### Python
 ```
 $ git clone https://github.com/nanoporetech/fast-ctc-decode.git
 $ cd fast-ctc-decode
 $ pip install --user maturin
 $ make test
+```
+
+### JS / Node
+```
+npm i
+npm test
 ```
 
 Note: You'll need a recent [rust](https://www.rust-lang.org/tools/install) compiler on your path to build the project.
