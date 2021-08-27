@@ -5,17 +5,16 @@
 #[cfg_attr(test, macro_use(array))]
 extern crate ndarray;
 
-extern crate test; // benchmarking
 extern crate serde_json;
+extern crate test; // benchmarking
 extern crate wasm_bindgen;
 
-use wasm_bindgen::prelude::*;
-use ndarray::{ArrayView };
-use std::fmt;
 use js_sys::Error;
+use ndarray::ArrayView;
 use serde_json::json;
+use std::fmt;
+use wasm_bindgen::prelude::*;
 
-#[macro_use]
 extern crate serde_derive;
 
 use ndarray::Array2;
@@ -27,7 +26,6 @@ use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PySequence;
 use pyo3::wrap_pyfunction;
-use std::fmt;
 
 #[cfg(feature = "fastexp")]
 mod duplex;
@@ -490,7 +488,7 @@ pub fn js_beam_search(
     beam_cut_threshold: f32,
     collapse_repeats: bool,
     shape: &JsValue,
-)-> Result<JsValue, JsValue> {
+) -> Result<JsValue, JsValue> {
     let shape: Vec<usize> = shape.into_serde().unwrap();
     let alphabet: Vec<String> = alphabet.into_serde().unwrap();
     let max_beam_cut = 1.0 / (alphabet.len() as f32);
@@ -504,7 +502,10 @@ pub fn js_beam_search(
         Error::new("beam_cut_threshold must be at least 0.0");
         return Ok(JsValue::from_str("Error"));
     } else if beam_cut_threshold >= max_beam_cut {
-        Error::new(&format!("beam_cut_threshold cannot be more than {}", max_beam_cut.to_string()));
+        Error::new(&format!(
+            "beam_cut_threshold cannot be more than {}",
+            max_beam_cut.to_string()
+        ));
         return Ok(JsValue::from_str("Error"));
     } else {
         let (seq, starts) = search::beam_search(
@@ -513,11 +514,12 @@ pub fn js_beam_search(
             beam_size,
             beam_cut_threshold,
             collapse_repeats,
-        ).unwrap();
+        )
+        .unwrap();
 
         let beam = json!({ "seq": seq, "starts": starts }).to_string();
         return Ok(JsValue::from_str(&beam));
-    } 
+    }
 }
 
 #[wasm_bindgen]
@@ -529,10 +531,9 @@ pub fn js_viterbi_search(
     qbias: f32,
     collapse_repeats: bool,
     shape: &JsValue,
-)-> Result<JsValue, JsValue> {
+) -> Result<JsValue, JsValue> {
     let shape: Vec<usize> = shape.into_serde().unwrap();
     let alphabet: Vec<String> = alphabet.into_serde().unwrap();
-    let max_beam_cut = 1.0 / (alphabet.len() as f32);
     let network_output: Vec<f32> = network_output.into_serde().unwrap();
     let network_output = ArrayView::from_shape((shape[0], shape[1]), &network_output).unwrap();
 
@@ -550,7 +551,8 @@ pub fn js_viterbi_search(
             qscale,
             qbias,
             collapse_repeats,
-        ).unwrap();
+        )
+        .unwrap();
 
         let beam = json!({ "seq": seq, "starts": starts }).to_string();
         return Ok(JsValue::from_str(&beam));
