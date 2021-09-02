@@ -1,12 +1,7 @@
-#![feature(static_nobundle)]
-#![feature(test)] // benchmarking
-
 #[macro_use(s)]
 #[cfg_attr(test, macro_use(array))]
 extern crate ndarray;
-
 extern crate serde_json;
-extern crate test; // benchmarking
 extern crate wasm_bindgen;
 
 use js_sys::Error;
