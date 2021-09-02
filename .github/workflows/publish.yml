@@ -16,7 +16,7 @@ jobs:
        run: |
          curl https://sh.rustup.rs -sSf | sh -s -- -y
          source $HOME/.cargo/env
-         rustup default nightly-2021-01-01
+         rustup default 1.54.0
          bash .github/workflows/build-wheels.sh
      - uses: actions/upload-artifact@v1
        with:

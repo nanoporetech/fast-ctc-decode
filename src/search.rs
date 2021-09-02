@@ -421,7 +421,7 @@ pub fn crf_greedy_search<D: Data<Elem = f32>>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use test::Bencher;
+    //use test::Bencher;
 
     #[test]
     fn crf_test_greedy() {
@@ -596,6 +596,7 @@ mod tests {
         assert_eq!(seq, "GGGAGAG");
     }
 
+    /*
     // This one is all blanks, and so returns no sequence (which means we're not benchmarking the
     // construction of the results).
     #[bench]
@@ -628,4 +629,5 @@ mod tests {
         });
         b.iter(|| viterbi_search(&network_output, &alphabet, false, qscale, qbias, true));
     }
+     */
 }

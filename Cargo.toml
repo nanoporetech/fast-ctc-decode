@@ -1,5 +1,3 @@
-cargo-features = ["resolver"]
-
 [package]
 name = "fast_ctc_decode"
 version = "0.3.0"
