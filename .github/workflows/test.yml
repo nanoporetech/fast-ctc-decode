@@ -37,7 +37,7 @@ jobs:
           toolchain: nightly-2021-01-01
           default: true
       - name: Rust unit tests
-        run: cargo test
+        run: cargo test --features=resolver
       - uses: actions/setup-python@v2
         with:
           python-version: '3.9'
