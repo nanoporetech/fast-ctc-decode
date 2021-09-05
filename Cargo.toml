@@ -3,7 +3,6 @@ name = "fast_ctc_decode"
 version = "0.3.0"
 authors = ["Vlado Boza <bozavlado@gmail.com>", "Chris Seymour <chris.seymour@nanoporetech.com>", "Jabari Holder <jholder@and.digital>"]
 edition = "2018"
-resolver = "2"
 
 [lib]
 name = "fast_ctc_decode"
@@ -23,8 +22,9 @@ serde_derive = "1.0.126"
 serde = {version = "1.0.126", features = ["derive"]}
 
 [features]
-default = ["fastexp"]
+default = ["fastexp", "resolver"]
 fastexp = []
+resolver = []
 
 [profile.release]
 lto=true
