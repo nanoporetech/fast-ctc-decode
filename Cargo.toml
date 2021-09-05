@@ -22,9 +22,8 @@ serde_derive = "1.0.126"
 serde = {version = "1.0.126", features = ["derive"]}
 
 [features]
-default = ["fastexp", "resolver"]
+default = ["fastexp"]
 fastexp = []
-resolver = []
 
 [profile.release]
 lto=true
