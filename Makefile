@@ -1,4 +1,5 @@
 clean:
+	cargo clean
 	rm -rf *~ dist *.egg-info build target
 
 build:

@@ -11,7 +11,6 @@ use std::fmt;
 use wasm_bindgen::prelude::*;
 
 extern crate serde_derive;
-
 use ndarray::Array2;
 use numpy::PyArray1;
 use numpy::PyArray2;
@@ -85,7 +84,9 @@ fn seq_to_vec(seq: &PySequence) -> PyResult<Vec<String>> {
     qbias = "0.0",
     collapse_repeats = true
 )]
-#[text_signature = "(network_output, alphabet, qstring=False, qscale=1.0, qbias=0.0, collapse_repeats=True)"]
+#[pyo3(
+    text_signature = "(network_output, alphabet, qstring=False, qscale=1.0, qbias=0.0, collapse_repeats=True)"
+)]
 fn viterbi_search(
     py: Python,
     network_output: &PyArray2<f32>,
@@ -121,7 +122,7 @@ fn viterbi_search(
 }
 
 #[pyfunction(qstring = false, qscale = "1.0", qbias = "0.0")]
-#[text_signature = "(network_output, init_state, alphabet)"]
+#[pyo3(text_signature = "(network_output, init_state, alphabet)")]
 fn crf_greedy_search(
     py: Python,
     network_output: &PyArray3<f32>,
@@ -158,7 +159,7 @@ fn crf_greedy_search(
 }
 
 #[pyfunction(beam_size = "5", beam_cut_threshold = "0.0")]
-#[text_signature = "(network_output, init_state, alphabet, beam_size, beam_cut_threshold)"]
+#[pyo3(text_signature = "(network_output, init_state, alphabet, beam_size, beam_cut_threshold)")]
 fn crf_beam_search(
     py: Python,
     network_output: &PyArray3<f32>,
@@ -223,7 +224,9 @@ fn crf_beam_search(
 /// Raises:
 ///     PyValueError: The constraints on the arguments have not been met.
 #[pyfunction(beam_size = "5", beam_cut_threshold = "0.0", collapse_repeats = true)]
-#[text_signature = "(network_output, alphabet, beam_size=5, beam_cut_threshold=0.0, collapse_repeats=True)"]
+#[pyo3(
+    text_signature = "(network_output, alphabet, beam_size=5, beam_cut_threshold=0.0, collapse_repeats=True)"
+)]
 fn beam_search(
     py: Python,
     network_output: &PyArray2<f32>,
@@ -308,7 +311,9 @@ fn beam_search(
     envelope = "None",
     collapse_repeats = true
 )]
-#[text_signature = "(network_output_1, network_output_2, alphabet, envelope=None, beam_size=5, beam_cut_threshold=0.0, collapse_repeats=True)"]
+#[pyo3(
+    text_signature = "(network_output_1, network_output_2, alphabet, envelope=None, beam_size=5, beam_cut_threshold=0.0, collapse_repeats=True)"
+)]
 fn beam_search_duplex(
     py: Python,
     network_output_1: &PyArray2<f32>,
@@ -389,7 +394,9 @@ fn beam_search_duplex(
 }
 
 #[pyfunction(beam_size = "5", beam_cut_threshold = "0.0", envelope = "None")]
-#[text_signature = "(network_output_1, init_state_1, network_output_2, init_state_2, alphabet, envelope=None, beam_size=5, beam_cut_threshold=0.0)"]
+#[pyo3(
+    text_signature = "(network_output_1, init_state_1, network_output_2, init_state_2, alphabet, envelope=None, beam_size=5, beam_cut_threshold=0.0)"
+)]
 fn crf_beam_search_duplex(
     py: Python,
     network_output_1: &PyArray3<f32>,
