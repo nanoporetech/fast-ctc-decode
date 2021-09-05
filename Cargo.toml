@@ -9,10 +9,10 @@ name = "fast_ctc_decode"
 crate-type = ["cdylib"]
 
 [dependencies]
-numpy = "0.13.1"
-ndarray-stats = "0.4"
-ndarray = { version = "0.14.0", features = ["blas", "serde"] }
-pyo3 = { version = "0.13.2", features = ["extension-module"] }
+numpy = "0.14.1"
+ndarray-stats = "0.5"
+ndarray = { version = "0.15.3", features = ["blas", "serde"] }
+pyo3 = { version = "0.14", features = ["extension-module"] }
 wasm-bindgen = { version = "0.2.50", features = ["serde-serialize"] }
 getrandom = { version = "0.2", features = ["js"] }
 web-sys = "0.3.51"
