@@ -9,5 +9,5 @@ develop:
 	maturin develop --release
 
 test:
-	cargo test
+	cargo test --features python
 	python3 tests/test_decode.py
