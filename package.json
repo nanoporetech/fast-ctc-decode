@@ -1,12 +1,12 @@
 {
-  "name": "fast-ctc",
-  "version": "1.0.0",
-  "description": "Fast CTC Decode via WASM",
+  "name": "fast-ctc-decode",
+  "version": "0.0.1",
+  "description": "Blitzing fast CTC decoding library.",
   "main": "pkg/fast_ctc_decode_wasm.js",
   "scripts": {
     "prepare": "node post-install.js",
     "install": "npm run build",
-    "build": "wasm-pack build --target web --debug && npm run prepare",
+    "build": "wasm-pack build --target web --release && npm run prepare",
     "serve": "serve -s pkg",
     "test": "jest --watch --runInBand --detectOpenHandles"
   },
@@ -14,7 +14,7 @@
     "type": "git",
     "url": "git+https://github.com/nanoporetech/fast-ctc-decode.git"
   },
-  "author": "Jabari Holder",
+  "author": "Chris Seymour",
   "homepage": "https://github.com/nanoporetech/fast-ctc-decode#readme",
   "devDependencies": {
     "@babel/plugin-syntax-dynamic-import": "^7.8.3",
@@ -44,5 +44,8 @@
         "statements": -15
       }
     }
+  },
+  "dependencies": {
+    "wasm-pack": "^0.10.1"
   }
 }

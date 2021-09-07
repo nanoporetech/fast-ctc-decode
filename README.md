@@ -39,6 +39,7 @@ $ pip install fast-ctc-decode
 ## Developer Quickstart
 
 ### Python
+
 ```
 $ git clone https://github.com/nanoporetech/fast-ctc-decode.git
 $ cd fast-ctc-decode
@@ -46,7 +47,8 @@ $ pip install --user maturin
 $ make test
 ```
 
-### JS / Node
+### JavaScript / Node
+
 ```
 npm i
 npm test

@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const srcFolder = path.join(__dirname, "test");
+const srcFolder = path.join(__dirname, "tests");
 const destFolder = path.join(__dirname, "pkg");
 
 // Copy index file to {workspace}/pkg/ folder
