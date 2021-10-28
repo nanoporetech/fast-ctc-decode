@@ -8,7 +8,8 @@
     "install": "npm run build",
     "build": "wasm-pack build --target web --release && npm run prepare",
     "serve": "serve -s pkg",
-    "test": "jest --watch --runInBand --detectOpenHandles"
+    "test": "jest --runInBand --detectOpenHandles",
+    "test:watch": "npm test --watch"
   },
   "files": [
     "pkg"
@@ -36,7 +37,7 @@
     "resetMocks": false,
     "preset": "jest-puppeteer",
     "collectCoverageFrom": [
-      "test/**/*.{js}",
+      "tests/**/*.{js}",
       "!node_modules/"
     ],
     "coverageThreshold": {
