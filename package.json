@@ -1,6 +1,6 @@
 {
   "name": "@nanoporetech/fast-ctc-decode",
-  "version": "0.0.1",
+  "version": "0.3.1",
   "description": "Blitzing fast CTC decoding library.",
   "main": "pkg/fast_ctc_decode_wasm.js",
   "scripts": {
