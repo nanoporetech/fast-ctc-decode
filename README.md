@@ -6,10 +6,12 @@ Blitzing fast CTC decoding library.
 
 ```
 $ pip install fast-ctc-decode
+$ npm i @nanopore/fast-ctc-decode
 ```
 
 ## Usage
 
+### Python
 ```python
 >>> from fast_ctc_decode import beam_search, viterbi_search
 >>>
@@ -23,6 +25,31 @@ $ pip install fast-ctc-decode
 >>> seq, path = beam_search(posteriors, alphabet, beam_size=5, beam_cut_threshold=0.1)
 >>> seq
 'ACACTCGCAGCGCGATACGACTGATCGAGATATACTCAGTGTACACAGT'
+```
+
+### Node / Web
+```js
+import init, { beam_search, viterbi_search } from 'fast-ctc';
+
+const floatArr = [0.0, 0.4, 0.6, 0.0, 0.3, 0.7, 0.3, 0.3];
+const alphabet = ["N","A","G"];
+const beamSize = 5;
+const beamCutThreshold = Number(0.0).toPrecision(2);
+const collapseRepeats = true;
+const shape = [10, 3];
+const string = false;
+const qBias = Number(0.0).toPrecision(2);
+const qScale = Number(1.0).toPrecision(2);
+
+// On web, note the base path will be your public folder
+init('fast_ctc_decode_wasm_bg.wasm');
+
+const viterbisearch = await beam_search(floatArr, alphabet, string, qScale, qBias, collapseRepeats, shape);
+
+const beamsearch = await beam_search(floatArr, alphabet, beamSize, beamCutThreshold, collapseRepeats, shape);
+
+console.log(viterbisearch); // ACCCAE
+console.log(beamsearch); // ACCCAE
 ```
 
 ## Benchmark
