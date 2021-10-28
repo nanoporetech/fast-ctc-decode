@@ -31,7 +31,7 @@ $ npm i @nanopore/fast-ctc-decode
 ```js
 import init, { beam_search, viterbi_search } from 'fast-ctc';
 
-const floatArr = [0.0, 0.4, 0.6, 0.0, 0.3, 0.7, 0.3, 0.3];
+const floatArr = [0.0, 0.4, 0.6, 0.0, 0.3, 0.7, 0.3, 0.3, 0.4, 0.4, 0.3, 0.3, 0.4, 0.3, 0.3, 0.3, 0.3, 0.4, 0.1, 0.4, 0.5, 0.1, 0.5, 0.4, 0.8, 0.1, 0.1, 0.1, 0.1, 0.8];
 const alphabet = ["N","A","G"];
 const beamSize = 5;
 const beamCutThreshold = Number(0.0).toPrecision(2);
@@ -48,8 +48,8 @@ const viterbisearch = await beam_search(floatArr, alphabet, string, qScale, qBia
 
 const beamsearch = await beam_search(floatArr, alphabet, beamSize, beamCutThreshold, collapseRepeats, shape);
 
-console.log(viterbisearch); // ACCCAE
-console.log(beamsearch); // ACCCAE
+console.log(viterbisearch); // GGAG
+console.log(beamsearch); // GAGAG
 ```
 
 ## Benchmark
