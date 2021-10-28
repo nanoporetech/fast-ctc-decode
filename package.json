@@ -10,6 +10,9 @@
     "serve": "serve -s pkg",
     "test": "jest --watch --runInBand --detectOpenHandles"
   },
+  "files": [
+    "pkg"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/nanoporetech/fast-ctc-decode.git"
