@@ -5,8 +5,7 @@
   "main": "pkg/fast_ctc_decode_wasm.js",
   "license" : "LICENSE.md",
   "scripts": {
-    "prepare": "node post-install.js",
-    "build": "wasm-pack build --target web --release && npm run prepare",
+    "build": "wasm-pack build --target web --release && node post-install.js",
     "serve": "serve -s pkg",
     "test": "jest --runInBand --detectOpenHandles",
     "test:watch": "npm test --watch"
