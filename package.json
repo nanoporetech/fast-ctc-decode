@@ -2,8 +2,8 @@
   "name": "@nanopore/fast-ctc-decode",
   "version": "0.3.1",
   "description": "Blitzing fast CTC decoding library.",
-  "main": "pkg/fast_ctc_decode_wasm.js",
-  "license" : "LICENSE.md",
+  "main": "pkg/fast_ctc_decode.js",
+  "license": "LICENSE.md",
   "scripts": {
     "build": "wasm-pack build --target web --release && node post-install.js",
     "serve": "serve -s pkg",
