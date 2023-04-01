@@ -5,7 +5,8 @@ curl https://sh.rustup.rs -sSf | sh -s -- -y
 source $HOME/.cargo/env
 rustup default 1.68.2
 
-cargo build
+free -h
+cargo build --jobs 1
 
 for PYBIN in /opt/python/cp3[7891]*/bin; do
     "${PYBIN}/pip" install maturin

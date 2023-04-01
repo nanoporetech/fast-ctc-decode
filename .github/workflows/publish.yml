@@ -33,7 +33,7 @@ jobs:
           docker run --privileged --rm tonistiigi/binfmt --install arm64
       - name: Build wheels
         run: |
-          docker run --workdir /src -v ${PWD}:/src ${{ matrix.container }} /bin/bash .github/workflows/build-wheels.sh
+          docker run --platform linux/arm64 --workdir /src -v ${PWD}:/src ${{ matrix.container }} /bin/bash .github/workflows/build-wheels.sh
       - uses: actions/upload-artifact@v3
         with:
           name: linux-aarch-wheels
