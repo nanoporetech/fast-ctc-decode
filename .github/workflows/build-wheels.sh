@@ -6,7 +6,7 @@ source $HOME/.cargo/env
 rustup default 1.68.2
 
 free -h
-cargo build --jobs 1
+cargo build --jobs 1 --config net.git-fetch-with-cli=true
 
 for PYBIN in /opt/python/cp3[7891]*/bin; do
     "${PYBIN}/pip" install maturin
