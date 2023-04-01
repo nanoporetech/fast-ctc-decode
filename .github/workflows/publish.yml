@@ -30,7 +30,7 @@ jobs:
       - uses: actions/checkout@v3
       - name: Install QEMU
         run: |
-          docker run --privileged --rm tonistiigi/binfmt --install all
+          docker run --privileged --rm tonistiigi/binfmt --install arm64
       - name: Build wheels
         run: |
           docker run --workdir /src -v ${PWD}:/src ${{ matrix.container }} /bin/bash .github/workflows/build-wheels.sh
