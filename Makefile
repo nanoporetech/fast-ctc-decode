@@ -3,10 +3,10 @@ clean:
 	rm -rf *~ dist *.egg-info build target
 
 build:
-	maturin build -i python3 --release
+	maturin build -F python  -i python3 --release
 
 develop:
-	maturin develop --release
+	maturin develop -F python --release
 
 test:
 	cargo test --features python
