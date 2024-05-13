@@ -8,7 +8,7 @@ rustup default 1.78.0
 free -h
 cargo build --jobs 1 --config net.git-fetch-with-cli=true
 
-for PYBIN in /opt/python/cp3[7891]*/bin; do
+for PYBIN in /opt/python/cp3[891]*/bin; do
     "${PYBIN}/pip" install maturin
     "${PYBIN}/maturin" build -F python -i "${PYBIN}/python" --release
 done

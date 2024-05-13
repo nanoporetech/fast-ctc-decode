@@ -142,7 +142,7 @@ pub fn js_viterbi_search(
 /// Python
 #[cfg(feature = "python")]
 fn seq_to_vec(seq: &PySequence) -> PyResult<Vec<String>> {
-    Ok(seq.tuple()?.iter().map(|x| x.to_string()).collect())
+    Ok(seq.to_tuple()?.iter().map(|x| x.to_string()).collect())
 }
 
 /// Perform a Viterbi search decode on an RNN output.
