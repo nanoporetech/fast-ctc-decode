@@ -3,7 +3,7 @@ set -e -x
 
 curl https://sh.rustup.rs -sSf | sh -s -- -y
 source $HOME/.cargo/env
-rustup default 1.68.2
+rustup default 1.78.0
 
 free -h
 cargo build --jobs 1 --config net.git-fetch-with-cli=true
