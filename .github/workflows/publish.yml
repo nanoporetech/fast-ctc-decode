@@ -56,6 +56,7 @@ jobs:
      - name: Build wheels
        run: |
          python3 -m pip install maturin
+         rustup target add x86_64-apple-darwin
          rustup target add aarch64-apple-darwin
          maturin build -F python --release --strip --target universal2-apple-darwin
      - uses: actions/upload-artifact@v3
