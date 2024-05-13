@@ -136,7 +136,7 @@ pub fn crf_beam_search<D: Data<Elem = f32>>(
             return Err(SearchError::RanOutOfBeam);
         }
         let top = beam[0].probability();
-        for mut x in &mut beam {
+        for x in &mut beam {
             x.label_prob /= top;
             x.gap_prob /= top;
         }
@@ -276,7 +276,7 @@ pub fn beam_search<D: Data<Elem = f32>>(
             return Err(SearchError::RanOutOfBeam);
         }
         let top = beam[0].probability();
-        for mut x in &mut beam {
+        for x in &mut beam {
             x.label_prob /= top;
             x.gap_prob /= top;
         }
