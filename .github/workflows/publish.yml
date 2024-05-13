@@ -57,8 +57,7 @@ jobs:
        run: |
          python3 -m pip install maturin
          rustup target add aarch64-apple-darwin
-         maturin build -F python --release --strip
-         maturin build -F python --release --strip --universal2
+         maturin build -F python --release --strip --target universal2-apple-darwin
      - uses: actions/upload-artifact@v3
        with:
          name: osx-${{ matrix.python-version }}-wheel
