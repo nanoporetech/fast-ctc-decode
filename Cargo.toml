@@ -16,6 +16,8 @@ ndarray = { version = "0.15.3", features = ["serde"] }
 pyo3 = { version = "0.14", features = ["extension-module"], optional = true }
 numpy = { version = "0.14.1", optional = true }
 
+proc-macro2 = "1.0.82"
+
 # wasm build
 wasm-bindgen = { version = "0.2.50", features = ["serde-serialize"] }
 getrandom = { version = "0.2", features = ["js"] }
