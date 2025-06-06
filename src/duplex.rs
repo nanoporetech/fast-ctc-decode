@@ -635,15 +635,18 @@ pub fn beam_search<D: Data<Elem = f32>, E: Data<Elem = usize>>(
         }
     }
 
-    let mut sequence = String::new();
+    let mut tokens: Vec<&str> = Vec::new();
 
     if beam[0].node != ROOT_NODE {
         for label in suffix_tree.iter_from_no_data(beam[0].node) {
-            sequence.push_str(&alphabet[label + 1]);
+            tokens.push(&alphabet[label + 1]);
         }
     }
 
-    Ok(sequence.chars().rev().collect())
+    tokens.reverse();
+    let sequence = tokens.concat();
+
+    Ok(sequence)
 }
 
 pub fn crf_beam_search<D: Data<Elem = f32>, E: Data<Elem = usize>>(

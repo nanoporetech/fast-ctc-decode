@@ -283,17 +283,21 @@ pub fn beam_search<D: Data<Elem = f32>>(
     }
 
     let mut path = Vec::new();
-    let mut sequence = String::new();
+    let mut tokens: Vec<&str> = Vec::new();
 
     if beam[0].node != ROOT_NODE {
         for (label, &time) in suffix_tree.iter_from(beam[0].node) {
             path.push(time);
-            sequence.push_str(&alphabet[label + 1]);
+            tokens.push(&alphabet[label + 1]);
         }
     }
 
     path.reverse();
-    Ok((sequence.chars().rev().collect::<String>(), path))
+    tokens.reverse();
+
+    let sequence = tokens.concat();
+
+    Ok((sequence, path))
 }
 
 fn find_max(
