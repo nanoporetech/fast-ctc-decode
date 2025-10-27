@@ -99,7 +99,7 @@ class Test1DBeamSearch(TestCase):
 
     def test_nans(self):
         """beam_search is passed NaN values"""
-        self.probs.fill(np.NaN)
+        self.probs.fill(np.nan)
         with self.assertRaisesRegex(RuntimeError, "Failed to compare values"):
             beam_search(self.probs, self.alphabet)
 
@@ -369,7 +369,7 @@ class TestDuplexBeamSearch(TestCase):
 
     def test_nans(self):
         """beam_search_duplex is passed NaN values"""
-        self.probs_1.fill(np.NaN)
+        self.probs_1.fill(np.nan)
         with self.assertRaisesRegex(RuntimeError, "Failed to compare values"):
             beam_search_duplex(self.probs_1, self.probs_2, self.alphabet)
 
